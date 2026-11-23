@@ -8,6 +8,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
   GEMINI_API_KEY: z.string().trim().optional(),
   GEMINI_MODEL: z.string().trim().default('gemini-3.1-flash-lite'),
+  /** Comma-separated models tried in order when the primary one fails (overload, quota, timeout). */
+  GEMINI_FALLBACK_MODELS: z.string().trim().default('gemini-2.5-flash-lite'),
   GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
   SESSION_SECRET: z.string().optional(),
   DATA_BACKEND: z.enum(['memory', 'firestore']).default('memory'),
@@ -20,7 +22,7 @@ const envSchema = z.object({
 export interface AppConfig {
   env: 'development' | 'test' | 'production';
   port: number;
-  gemini: { apiKey?: string; model: string; timeoutMs: number };
+  gemini: { apiKey?: string; model: string; fallbackModels: string[]; timeoutMs: number };
   sessionSecret: string;
   dataBackend: 'memory' | 'firestore';
   firestore: { projectId?: string; serviceAccountBase64?: string };
@@ -46,6 +48,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     gemini: {
       apiKey: parsed.GEMINI_API_KEY || undefined,
       model: parsed.GEMINI_MODEL,
+      fallbackModels: parsed.GEMINI_FALLBACK_MODELS.split(',')
+        .map((m) => m.trim())
+        .filter(Boolean),
       timeoutMs: parsed.GEMINI_TIMEOUT_MS,
     },
     sessionSecret: secret,

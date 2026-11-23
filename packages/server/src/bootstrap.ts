@@ -29,6 +29,7 @@ export async function buildServices(
     ? new GeminiClient({
         apiKey: config.gemini.apiKey,
         model: config.gemini.model,
+        fallbackModels: config.gemini.fallbackModels,
         timeoutMs: config.gemini.timeoutMs,
       })
     : null;

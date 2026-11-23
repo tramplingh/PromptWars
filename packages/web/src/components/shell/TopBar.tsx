@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { pageMeta } from '../../lib/navigation';
 import { NotificationsPopover } from './NotificationsPopover';
 import { ProfileMenu } from './ProfileMenu';
+import { ThemeToggle } from './ThemeToggle';
 
 interface TopBarProps {
   onOpenMenu: () => void;
@@ -83,6 +84,7 @@ export function TopBar({ onOpenMenu, menuButtonRef }: TopBarProps) {
       </form>
 
       <div className="ml-auto flex items-center gap-1 md:ml-2">
+        <ThemeToggle />
         <NotificationsPopover />
         <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
         <ProfileMenu />

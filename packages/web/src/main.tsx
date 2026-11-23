@@ -5,8 +5,12 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { ToastProvider } from './components/Toast';
 import { ApiClientError } from './lib/api';
+import { applyTheme, preferredTheme } from './lib/theme';
 import '@fontsource-variable/inter/wght.css';
 import './index.css';
+
+// Apply the theme before the first paint so there is no light flash in dark mode.
+applyTheme(preferredTheme());
 
 const queryClient = new QueryClient({
   defaultOptions: {

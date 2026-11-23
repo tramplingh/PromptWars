@@ -35,7 +35,7 @@ function TriggerLabel({ persona }: { persona: Persona | null | undefined }) {
           <span className="sr-only">Viewing as </span>
           {persona?.name ?? 'Choose profile'}
         </span>
-        <span className="block text-2xs capitalize text-slate-500">
+        <span className="block text-2xs capitalize text-slate-600">
           <span className="sr-only">, </span>
           {persona?.role ?? 'demo mode'}
           <span className="sr-only">. Switch profile</span>
@@ -123,7 +123,7 @@ export function ProfileMenu() {
                             <span className="block truncate text-sm font-medium text-ink">
                               {p.name}
                             </span>
-                            <span className="block truncate text-xs text-slate-500">{p.title}</span>
+                            <span className="block truncate text-xs text-slate-600">{p.title}</span>
                           </span>
                           {active && (
                             <Check aria-hidden="true" className="h-4 w-4 text-brand-700" />
