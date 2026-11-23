@@ -19,7 +19,7 @@ import { PlannerService } from './services/plannerService.js';
 /** Composition root: builds the object graph from configuration. */
 export async function buildServices(
   config: AppConfig,
-  clock: Clock = systemClock(config.campusTimeZone),
+  clock: Clock = systemClock(config.campusTimeZone, config.clockOffsetHours * 3_600_000),
 ): Promise<Services> {
   const catalog = new CatalogService({ departments, labs, equipment, personas });
   const seed = buildSeedBookings(clock.today(), clock.now(), clock.hour());

@@ -17,6 +17,8 @@ const envSchema = z.object({
   /** Base64-encoded service-account JSON; used on hosts without ADC (e.g. Vercel). */
   FIREBASE_SERVICE_ACCOUNT: z.string().trim().optional(),
   CAMPUS_TIMEZONE: z.string().default('Asia/Kolkata'),
+  /** Shifts the campus clock, e.g. -9 to demo lab opening hours in the evening. Keep VITE_CLOCK_OFFSET_HOURS equal. */
+  CLOCK_OFFSET_HOURS: z.coerce.number().min(-48).max(48).default(0),
 });
 
 export interface AppConfig {
@@ -27,6 +29,7 @@ export interface AppConfig {
   dataBackend: 'memory' | 'firestore';
   firestore: { projectId?: string; serviceAccountBase64?: string };
   campusTimeZone: string;
+  clockOffsetHours: number;
 }
 
 /**
@@ -60,5 +63,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       serviceAccountBase64: parsed.FIREBASE_SERVICE_ACCOUNT || undefined,
     },
     campusTimeZone: parsed.CAMPUS_TIMEZONE,
+    clockOffsetHours: parsed.CLOCK_OFFSET_HOURS,
   };
 }

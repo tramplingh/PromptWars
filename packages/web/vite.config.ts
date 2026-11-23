@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
+  // Read VITE_* settings (e.g. VITE_CLOCK_OFFSET_HOURS) from the repository-root .env.
+  envDir: '../..',
   server: {
     port: 5173,
     proxy: { '/api': `http://localhost:${process.env.API_PORT ?? 8080}` },

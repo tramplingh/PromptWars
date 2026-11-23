@@ -12,7 +12,9 @@ export interface Clock {
   campusTime(iso?: string): CampusTime;
 }
 
-export function systemClock(timeZone: string): Clock {
+/** Campus clock; `offsetMs` shifts "now" (CLOCK_OFFSET_HOURS, for demos outside lab hours). */
+export function systemClock(timeZone: string, offsetMs = 0): Clock {
+  const current = () => new Date(Date.now() + offsetMs);
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -24,7 +26,7 @@ export function systemClock(timeZone: string): Clock {
   });
   const campusTime = (iso?: string): CampusTime => {
     const parts = Object.fromEntries(
-      formatter.formatToParts(iso ? new Date(iso) : new Date()).map((p) => [p.type, p.value]),
+      formatter.formatToParts(iso ? new Date(iso) : current()).map((p) => [p.type, p.value]),
     );
     return {
       date: `${parts.year}-${parts.month}-${parts.day}`,
@@ -32,7 +34,7 @@ export function systemClock(timeZone: string): Clock {
     };
   };
   return {
-    now: () => new Date().toISOString(),
+    now: () => current().toISOString(),
     today: () => campusTime().date,
     hour: () => Math.floor(campusTime().minutes / 60),
     campusTime,

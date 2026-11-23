@@ -1,6 +1,7 @@
 import { formatHour, type DayAvailability, type HourCell } from '@lablink/shared';
 import { memo } from 'react';
 import { localToday, weekdayLabel } from '../lib/format';
+import { now } from '../lib/clock';
 
 import type { Selection } from '../lib/bookingValidation';
 
@@ -68,7 +69,7 @@ export const AvailabilityGrid = memo(function AvailabilityGrid({
 }: Props) {
   const hours = days[0]?.hours.map((h) => h.hour) ?? [];
   const today = localToday();
-  const currentHour = new Date().getHours();
+  const currentHour = now().getHours();
 
   const isSelected = (date: string, hour: number) =>
     selection?.date === date &&

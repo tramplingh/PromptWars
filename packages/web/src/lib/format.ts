@@ -1,8 +1,9 @@
 import { parseIsoDate } from '@lablink/shared';
+import { now as clockNow, nowMs } from './clock';
 
 /** Today's date in the browser's local timezone as YYYY-MM-DD. */
 export function localToday(): string {
-  const now = new Date();
+  const now = clockNow();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
@@ -30,7 +31,7 @@ export function percent(value: number): string {
 }
 
 export function relativeTime(iso: string): string {
-  const minutes = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  const minutes = Math.round((nowMs() - Date.parse(iso)) / 60_000);
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
@@ -71,12 +72,12 @@ export function splitByRecency(dates: string[], direction: 'past' | 'future') {
 }
 
 export function greeting(): string {
-  const hour = new Date().getHours();
+  const hour = clockNow().getHours();
   if (hour < 12) return 'Good morning';
   return hour < 17 ? 'Good afternoon' : 'Good evening';
 }
 
 /** The browser's current date and minute-of-day, in the shape the shared check-in rules use. */
-export function localCampusTime(now = new Date()): { date: string; minutes: number } {
+export function localCampusTime(now = clockNow()): { date: string; minutes: number } {
   return { date: localDateOf(now.toISOString()), minutes: now.getHours() * 60 + now.getMinutes() };
 }

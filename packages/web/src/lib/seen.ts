@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { now } from './clock';
 
 /**
  * Per-viewer "last seen" marker for the updates feed. Stored in localStorage
@@ -35,7 +36,7 @@ export function useLastSeen(personaId: string | undefined) {
   const markAllRead = useCallback(() => {
     if (!personaId) return;
     try {
-      window.localStorage.setItem(KEY(personaId), new Date().toISOString());
+      window.localStorage.setItem(KEY(personaId), now().toISOString());
     } catch {
       // Storage blocked (private mode): nothing to persist.
     }
