@@ -181,9 +181,26 @@ describe('campus map', () => {
       ).toBeInTheDocument(),
     );
     await userEvent.click(within(map).getByRole('button', { name: /Biosignal Kit/ }));
-    const details = screen.getByRole('region', { name: 'Biosignal Kit details' });
+    const details = screen.getByRole('complementary', { name: 'Biosignal Kit details' });
     expect(within(details).getByText('Down for maintenance')).toBeInTheDocument();
+    // Priya is in ECE, the kit is in Bio Sciences: the walking route is explained in text.
+    expect(within(details).getByText(/Route shown: ECE Block → Bio Sciences/)).toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it('opens a building panel listing its equipment', async () => {
+    mockApi(baseRoutes);
+    renderWithProviders(<App />, { route: '/map' });
+    const map = await screen.findByRole('group', { name: 'Campus map' });
+    await userEvent.click(
+      within(map).getByRole('button', { name: 'ECE Block (your department), 1 item' }),
+    );
+    const panel = screen.getByRole('complementary', { name: 'ECE Block details' });
+    expect(within(panel).getByRole('button', { name: /Oscilloscope/ })).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close details' }));
+    expect(
+      screen.queryByRole('complementary', { name: 'ECE Block details' }),
+    ).not.toBeInTheDocument();
   });
 });
 

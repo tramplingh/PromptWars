@@ -45,6 +45,11 @@ export default {
         raised: '0 8px 24px rgb(15 23 42 / 0.10), 0 2px 6px rgb(15 23 42 / 0.06)',
       },
       keyframes: {
+        dash: { to: { strokeDashoffset: '-24' } },
+        'pin-pulse': {
+          '0%': { transform: 'scale(1)', opacity: '0.55' },
+          '100%': { transform: 'scale(2.4)', opacity: '0' },
+        },
         'fade-in': {
           from: { opacity: '0', transform: 'translateY(4px)' },
           to: { opacity: '1', transform: 'none' },
@@ -52,6 +57,8 @@ export default {
       },
       animation: {
         'fade-in': 'fade-in 150ms ease-out',
+        dash: 'dash 0.8s linear infinite',
+        'pin-pulse': 'pin-pulse 1.6s ease-out infinite',
       },
     },
   },
