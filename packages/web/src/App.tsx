@@ -90,11 +90,14 @@ export function App() {
         <Route
           path="*"
           element={
-            <EmptyState title="Page not found">
-              <Link to="/" className="font-semibold text-brand-700 hover:underline">
-                Return to the dashboard
-              </Link>
-            </EmptyState>
+            <div className="space-y-6">
+              <h1 className="page-title">Page not found</h1>
+              <EmptyState title="There is nothing at this address">
+                <Link to="/" className="font-semibold text-brand-700 hover:underline">
+                  Return to the dashboard
+                </Link>
+              </EmptyState>
+            </div>
           }
         />
       </Route>

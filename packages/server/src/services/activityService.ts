@@ -51,27 +51,15 @@ export class ActivityService {
   }
 
   private eventsFor(booking: Booking): ActivityEvent[] {
-    const decision = booking.decision;
-    // System decisions on a fresh booking mean it was confirmed instantly; later
-    // system decisions are the no-show sweep (release) and its backfill.
-    const releasedOrBackfilled =
-      booking.status === 'no-show' || booking.backfilledFrom !== undefined;
-    const autoConfirmed = decision?.by === 'system' && !releasedOrBackfilled;
+    const { decision } = booking;
+    const autoConfirmed = isInstantConfirmation(booking);
     const events = [
       this.event(booking, autoConfirmed ? 'confirmed' : 'requested', booking.createdAt),
     ];
     if (decision && !autoConfirmed) {
-      const type: ActivityType =
-        booking.status === 'no-show'
-          ? 'no-show'
-          : booking.backfilledFrom
-            ? 'backfilled'
-            : booking.reallocatedFrom
-              ? 'reallocated'
-              : booking.status === 'rejected'
-                ? 'declined'
-                : 'approved';
-      events.push(this.event(booking, type, decision.at, decision.note || undefined));
+      events.push(
+        this.event(booking, decisionEventType(booking), decision.at, decision.note || undefined),
+      );
     }
     if (booking.checkedInAt) events.push(this.event(booking, 'checked-in', booking.checkedInAt));
     return events;
@@ -92,4 +80,21 @@ export class ActivityService {
       ...(note && { note }),
     };
   }
+}
+
+/**
+ * System decisions on a fresh booking mean it was confirmed instantly; later
+ * system decisions are the no-show sweep (release) and its backfill.
+ */
+function isInstantConfirmation(booking: Booking): boolean {
+  const releasedOrBackfilled = booking.status === 'no-show' || booking.backfilledFrom !== undefined;
+  return booking.decision?.by === 'system' && !releasedOrBackfilled;
+}
+
+/** Which kind of event a booking's decision represents, most specific first. */
+export function decisionEventType(booking: Booking): ActivityType {
+  if (booking.status === 'no-show') return 'no-show';
+  if (booking.backfilledFrom) return 'backfilled';
+  if (booking.reallocatedFrom) return 'reallocated';
+  return booking.status === 'rejected' ? 'declined' : 'approved';
 }

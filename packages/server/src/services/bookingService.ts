@@ -32,6 +32,12 @@ export const BOOKING_HORIZON_DAYS = 30;
 /** Working days of availability returned by default. */
 export const DEFAULT_AVAILABILITY_DAYS = 5;
 
+/** A new request competing with others is queued; otherwise approval policy decides. */
+export function initialOutcome(contended: boolean, requiresApproval: boolean): BookingOutcome {
+  if (contended) return 'queued-for-resolution';
+  return requiresApproval ? 'awaiting-approval' : 'confirmed';
+}
+
 export class BookingService {
   constructor(
     private readonly repo: BookingRepository,
@@ -104,12 +110,10 @@ export class BookingService {
 
       if (!hasCapacity(equipment, approved, input.slot)) return { writes: [], result: null };
 
-      const contended = !hasCapacity(equipment, active, input.slot);
-      const outcome: BookingOutcome = contended
-        ? 'queued-for-resolution'
-        : equipment.requiresApproval
-          ? 'awaiting-approval'
-          : 'confirmed';
+      const outcome = initialOutcome(
+        !hasCapacity(equipment, active, input.slot),
+        equipment.requiresApproval,
+      );
 
       const now = this.clock.now();
       const booking: Booking = {

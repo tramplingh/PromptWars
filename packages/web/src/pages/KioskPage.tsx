@@ -86,17 +86,23 @@ export function KioskPage() {
   );
 }
 
+/** Kiosk status for one session: released, checked in, or still expected. */
+function sessionState(session: BookingView) {
+  if (session.status === 'no-show') {
+    return { icon: TimerOff, label: 'No-show · released', className: 'text-rose-700' };
+  }
+  if (session.checkedInAt) {
+    return {
+      icon: CheckCircle2,
+      label: `Checked in ${timeOfDay(session.checkedInAt)}`,
+      className: 'text-teal-700',
+    };
+  }
+  return { icon: Clock, label: 'Awaiting check-in', className: 'text-amber-700' };
+}
+
 function SessionRow({ session }: { session: BookingView }) {
-  const state =
-    session.status === 'no-show'
-      ? { icon: TimerOff, label: 'No-show · released', className: 'text-rose-700' }
-      : session.checkedInAt
-        ? {
-            icon: CheckCircle2,
-            label: `Checked in ${timeOfDay(session.checkedInAt)}`,
-            className: 'text-teal-700',
-          }
-        : { icon: Clock, label: 'Awaiting check-in', className: 'text-amber-700' };
+  const state = sessionState(session);
   return (
     <li className="flex flex-wrap items-center gap-3 px-5 py-3">
       <span className="metric w-28 text-sm">

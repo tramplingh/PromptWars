@@ -1,5 +1,7 @@
 # LabLink — Making College Laboratories More Accessible
 
+[![CI](https://github.com/tramplingh/PromptWars/actions/workflows/ci.yml/badge.svg)](https://github.com/tramplingh/PromptWars/actions/workflows/ci.yml)
+
 A GenAI-powered campus laboratory resource-sharing platform. Students discover specialised equipment across departments, book slots, request project-based access, and faculty approve requests. When several students want the same equipment at the same time, a **deterministic fair-share engine** recommends an allocation and **Gemini** explains it in plain language.
 
 > **No login pages.** A profile menu in the top bar lets anyone explore the student, faculty and lab-admin experiences instantly. Each choice issues a signed, HttpOnly session cookie, and the server enforces every permission.
@@ -12,6 +14,17 @@ Most lab-booking tools are a calendar with an approve button. LabLink goes after
 2. **Fairness you can audit.** Contested slots are decided by a transparent, unit-tested scoring engine (deadline, fair share, capability fit, waiting time), not by an LLM. Losers are moved to a reserved fair alternative, and Gemini explains the outcome to faculty and to each student.
 3. **No-show release with automatic backfill.** Students check in at the device by scanning a daily rotating QR code on the lab kiosk. Unclaimed sessions are released 15 minutes after the start and handed to the highest-priority queued request; no-shows count against the student's fair share. Booked-but-unused time is the biggest waste in shared labs, and this closes that gap.
 4. **A live, explorable campus.** An isometric campus map shows every instrument's real-time status and draws the walking route from your department to the equipment you pick.
+
+## At a glance: evidence per evaluation area
+
+| Area              | Where to look                                                                                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Problem alignment | Every requirement mapped to a feature in [Approach and Logic](#approach-and-logic); fair-share engine, AI project planner, no-show backfill                             |
+| Code quality      | Layered design and decision notes in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); enforced complexity and size limits; pure domain package shared by client and server |
+| Security          | Signed HttpOnly sessions, server-side authorisation, strict CSP, CSRF guard, rate limits, schema-validated and sanitised LLM output ([Security](#security))             |
+| Efficiency        | ~21 KB gzipped landing page, lazy routes, cached Gemini calls, HTTP caching ([Efficiency](#efficiency))                                                                 |
+| Testing           | 173 tests, coverage thresholds enforced in CI ([Testing](#testing))                                                                                                     |
+| Accessibility     | WAI-ARIA patterns, text equivalents for the map and calendar, axe-core scans in tests ([Accessibility](#accessibility))                                                 |
 
 **60-second demo:** _Dashboard → Project planner → "Final-year drone" example → Book all → My bookings (check in with the kiosk code) → switch to Dr. Kavitha Rao → Approvals → Explain with AI → Apply fair allocation → Campus map → Updates feed shows the no-show release and backfill._
 
@@ -119,11 +132,19 @@ Every Gemini feature has a **deterministic rule-based fallback** (keyword/synony
 packages/
   shared/   Domain types, Zod schemas, calendar maths, allocation engine, project scheduler, check-in rules (pure, framework-free)
   server/   Express API: routes → services → repositories; Gemini client; Firestore/in-memory storage
-  web/      React + Vite + Tailwind SPA, TanStack Query, code-split pages
+  web/      React + Vite + Tailwind SPA: pages/ (route containers), components/<feature>/, lib/ (pure helpers + hooks)
 api/        Vercel serverless entry (re-exports the bundled Express app)
+docs/       ARCHITECTURE.md: layers, request lifecycle, design decisions, API reference
 ```
 
-The server follows a layered design: **routes** (HTTP, validation) → **services** (business rules) → **repositories** (storage behind a `BookingRepository` interface with in-memory and Firestore implementations). Dependencies are wired in one composition root (`bootstrap.ts`) and injected, which keeps every layer testable with a fixed clock and a fake LLM.
+The server follows a layered design: **routes** (HTTP, validation) → **services** (business rules) → **repositories** (storage behind a `BookingRepository` interface with in-memory and Firestore implementations). Dependencies are wired in one composition root (`bootstrap.ts`) and injected, which keeps every layer testable with a fixed clock and a fake LLM. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request lifecycle, design decisions and full API reference.
+
+### Code quality
+
+- **One source of truth for rules:** scoring, allocation, scheduling, check-in and validation live in the framework-free `shared` package, used by the browser (instant feedback) and the server (enforcement).
+- **Small, focused modules:** ESLint enforces cyclomatic complexity ≤ 12, nesting depth ≤ 4, ≤ 300 lines per file and ≤ 100 lines per function, and bans non-null assertions and nested ternaries. Pages only compose feature components; derivations live in pure, unit-tested helpers (`web/src/lib`).
+- **AI code split by concern:** orchestration (`aiService`), output contracts (`outputSchemas`), prompts, sanitising and deterministic fallbacks are separate modules.
+- **Strict TypeScript** everywhere, Prettier formatting, and a CI pipeline (format → lint → typecheck → tests with coverage thresholds → build → `npm audit`).
 
 ## Assumptions
 
@@ -155,7 +176,7 @@ The server follows a layered design: **routes** (HTTP, validation) → **service
 
 ## Efficiency
 
-- The landing dashboard ships about **20 KB gzipped** of app code (plus a long-cached vendor chunk). Every other page (equipment, map, approvals, utilisation) is lazy-loaded, and Zod loads only on the booking page (`sideEffects: false` tree-shaking).
+- The landing dashboard ships about **21 KB gzipped** of app code (plus a long-cached vendor chunk). Every other page (equipment, map, approvals, utilisation) is lazy-loaded, and Zod loads only on the booking page (`sideEffects: false` tree-shaking).
 - The campus map is hand-built inline SVG (no map library or tiles); live status polls once a minute and pauses while the tab is hidden.
 - The QR generator only loads with the kiosk page; the no-show sweep is throttled to once per 30 seconds per instance.
 - The updates feed is **derived** from booking history on the server (no duplicate event store), and the Inter font is self-hosted (variable weight file, no third-party requests).
@@ -167,15 +188,18 @@ The server follows a layered design: **routes** (HTTP, validation) → **service
 ## Testing
 
 ```bash
-npm test          # all workspaces (141 tests)
-npm run check     # typecheck + lint + tests
+npm test               # all workspaces (173 tests)
+npm run test:coverage  # with V8 coverage and enforced thresholds
+npm run check          # typecheck + lint + tests with coverage (also run in CI)
 ```
 
 | Package       | What is covered                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `shared` (41) | Calendar maths, capacity, free-slot search, scoring factors, conflict detection, fair resolution (determinism, no duplicate alternatives, deadline feasibility); **project scheduler** (dependency order, cycles, session splitting, primary capability, deadline, own-booking overlap, determinism); **check-in rules** (window, grace for walk-ups, no-show fair-share penalty)                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `server` (73) | Supertest API integration: **planner** (Gemini and fallback breakdowns, output sanitisation, feasible chains, booking a plan, validation); **check-in** (kiosk codes, wrong/rotated codes, release + backfill, approval-required equipment not auto-approved, backfilled students keep their grace period); AI health reporting; live equipment status (in-use / closed / maintenance), role-scoped activity feed, booking outcomes, validation edge cases, alternatives on 409, double-booking, cancellation ownership, approvals, department scoping, end-to-end conflict resolution; security (CSP, cookie flags, CSRF 415, oversized/malformed bodies, rate limiting, session tampering/expiry); AI service with a fake LLM (hallucinated id filtering, prompt-injection wrapping, caching, fallback on invalid output); transaction serialisation |
-| `web` (27)    | Components and pages with Testing Library: project planner (steps, gaps, book all), lab kiosk, QR check-in link, campus-geometry unit tests, dashboard, catalogue grid/table + filtering, AI results, campus-map pin labels, profile switching, notifications (Escape returns focus), role-aware navigation, auto-selected profile (no login page), keyboard selection, and **axe-core accessibility scans**                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `web` (59)    | Components, pages and end-to-end UI flows with Testing Library: booking a slot (validation → confirmation), approvals (AI explanation, apply fair allocation, decisions with notes), my bookings, utilisation insights; unit tests for catalogue filters, booking validation, activity-feed grouping, planner helpers, focus trapping, persisted preferences and map selection; project planner (steps, gaps, book all), lab kiosk, QR check-in link, campus-geometry unit tests, dashboard, catalogue grid/table + filtering, AI results, campus-map pin labels, profile switching, notifications (Escape returns focus), role-aware navigation, auto-selected profile (no login page), keyboard selection, and **axe-core accessibility scans**                                                                                                      |
+
+Line coverage: **shared 94%**, **server 88%**, **web 87%**. Each package has thresholds in its Vitest config (shared ≥ 90%, server ≥ 85%, web ≥ 85% lines), so a coverage drop fails CI.
 
 ## Accessibility
 

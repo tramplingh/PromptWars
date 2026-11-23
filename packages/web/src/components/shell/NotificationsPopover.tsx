@@ -16,6 +16,8 @@ export function NotificationsPopover() {
   const popover = usePopover();
 
   const unread = events.filter((e) => e.at > lastSeen);
+  // The badge text is part of the button's accessible name, so both say the same thing.
+  const badge = unread.length > 99 ? '99+' : String(unread.length);
   const seen = events.filter((e) => e.at <= lastSeen).slice(0, 4);
 
   return (
@@ -23,7 +25,7 @@ export function NotificationsPopover() {
       <button
         type="button"
         className="icon-btn relative"
-        aria-label={`Notifications${unread.length ? `, ${unread.length} unread` : ''}`}
+        aria-label={`Notifications${unread.length ? `, ${badge} unread` : ''}`}
         {...popover.triggerProps}
       >
         <Bell aria-hidden="true" className="h-5 w-5" />
@@ -32,7 +34,7 @@ export function NotificationsPopover() {
             aria-hidden="true"
             className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-2xs font-bold text-white"
           >
-            {unread.length > 9 ? '9+' : unread.length}
+            {badge}
           </span>
         )}
       </button>
@@ -109,7 +111,7 @@ function EventSection({
                   <span className={`block font-medium ${highlight ? 'text-rose-950' : 'text-ink'}`}>
                     {activitySentence(e)}
                   </span>
-                  <span className="text-xs text-slate-500">{relativeTime(e.at)}</span>
+                  <span className="text-xs text-slate-600">{relativeTime(e.at)}</span>
                 </span>
                 <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500" />
               </Link>

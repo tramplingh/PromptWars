@@ -15,27 +15,25 @@ interface TabsProps<T extends string> {
   panelId: string;
 }
 
+/** Roving-focus target for a key press, wrapping at both ends; null for other keys. */
+export function nextTabIndex(key: string, index: number, count: number): number | null {
+  const last = count - 1;
+  const moves: Record<string, number> = {
+    ArrowRight: index === last ? 0 : index + 1,
+    ArrowLeft: index === 0 ? last : index - 1,
+    Home: 0,
+    End: last,
+  };
+  return moves[key] ?? null;
+}
+
 /** WAI-ARIA tablist with roving focus (arrow keys, Home/End). */
 export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }: TabsProps<T>) {
   const baseId = useId();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const onKeyDown = (event: KeyboardEvent, index: number) => {
-    const last = tabs.length - 1;
-    const next =
-      event.key === 'ArrowRight'
-        ? index === last
-          ? 0
-          : index + 1
-        : event.key === 'ArrowLeft'
-          ? index === 0
-            ? last
-            : index - 1
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? last
-              : null;
+    const next = nextTabIndex(event.key, index, tabs.length);
     if (next === null) return;
     event.preventDefault();
     const tab = tabs[next];

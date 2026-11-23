@@ -1,8 +1,8 @@
 import type { PlanBookingResult, ProjectPlanResponse } from '@lablink/shared';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { sanitiseSteps } from '../src/ai/aiService.js';
-import { decomposeFallback } from '../src/ai/fallbacks.js';
+import { sanitiseSteps } from '../src/ai/sanitise.js';
+import { decomposeFallback } from '../src/ai/fallbackPlanner.js';
 import type { JsonGenerationRequest, LlmClient } from '../src/ai/llmClient.js';
 import { equipment } from '../src/data/catalog.js';
 import { buildTestApp, loginAs } from './helpers.js';

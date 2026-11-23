@@ -23,16 +23,18 @@ const days: DayAvailability[] = [
 describe('AvailabilityGrid', () => {
   it('describes every cell in text, not only colour', () => {
     render(<AvailabilityGrid days={days} units={2} selection={null} onSelect={() => undefined} />);
-    expect(screen.getByRole('button', { name: /9AM: available/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /10AM: 1 of 2 units available/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /11AM: fully booked/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /12PM: requested by others/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /9AM: Free, available/ })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: /10AM: 1\/2 free: 1 of 2 units available/ }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: /11AM: Booked/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /12PM: Requested by others/ })).toBeEnabled();
   });
 
   it('selects a start time with the keyboard', async () => {
     const onSelect = vi.fn();
     render(<AvailabilityGrid days={days} units={2} selection={null} onSelect={onSelect} />);
-    const cell = screen.getByRole('button', { name: /9AM: available/ });
+    const cell = screen.getByRole('button', { name: /9AM: Free, available/ });
     cell.focus();
     await userEvent.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledWith(FUTURE, 9);

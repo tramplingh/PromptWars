@@ -85,44 +85,7 @@ export const IsoCampus = memo(function IsoCampus({
         />
       ))}
 
-      {route.length > 1 && (
-        <g>
-          <polyline
-            points={toPoints(route)}
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="9"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <polyline
-            points={toPoints(route)}
-            fill="none"
-            stroke="#1d4ed8"
-            strokeWidth="4"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            strokeDasharray="12 12"
-            className="motion-safe:animate-dash"
-          />
-          <circle
-            cx={route[0]!.x}
-            cy={route[0]!.y}
-            r="7"
-            fill="#1d4ed8"
-            stroke="#ffffff"
-            strokeWidth="3"
-          />
-          <circle
-            cx={route[route.length - 1]!.x}
-            cy={route[route.length - 1]!.y}
-            r="7"
-            fill="#ffffff"
-            stroke="#1d4ed8"
-            strokeWidth="3"
-          />
-        </g>
-      )}
+      <Route points={route} />
 
       {stems.map((s) => (
         <line
@@ -202,6 +165,33 @@ function Tree({ x, y }: { x: number; y: number }) {
       <ellipse cx={base.x} cy={base.y} rx="9" ry="4.5" fill="#0f172a" opacity="0.06" />
       <line x1={base.x} y1={base.y} x2={crown.x} y2={crown.y} stroke="#a8a29e" strokeWidth="2.5" />
       <circle cx={crown.x} cy={crown.y} r="10" fill="#bbf7d0" stroke="#86efac" />
+    </g>
+  );
+}
+
+/** Animated walking route: white casing, dashed blue line, filled start and hollow end markers. */
+function Route({ points }: { points: Point[] }) {
+  const start = points[0];
+  const end = points.at(-1);
+  if (!start || !end || points.length < 2) return null;
+  const line = {
+    points: toPoints(points),
+    fill: 'none',
+    strokeLinejoin: 'round',
+    strokeLinecap: 'round',
+  } as const;
+  return (
+    <g>
+      <polyline {...line} stroke="#ffffff" strokeWidth="9" />
+      <polyline
+        {...line}
+        stroke="#1d4ed8"
+        strokeWidth="4"
+        strokeDasharray="12 12"
+        className="motion-safe:animate-dash"
+      />
+      <circle cx={start.x} cy={start.y} r="7" fill="#1d4ed8" stroke="#ffffff" strokeWidth="3" />
+      <circle cx={end.x} cy={end.y} r="7" fill="#ffffff" stroke="#1d4ed8" strokeWidth="3" />
     </g>
   );
 }

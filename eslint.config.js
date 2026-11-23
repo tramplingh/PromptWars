@@ -26,4 +26,22 @@ export default tseslint.config(
       ...jsxA11y.configs.strict.rules,
     },
   },
+  {
+    // Maintainability budget for application code: small files, short focused
+    // functions, low branching, and no unchecked non-null assertions.
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    rules: {
+      complexity: ['error', 12],
+      'max-depth': ['error', 4],
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 100, skipBlankLines: true, skipComments: true }],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      'no-nested-ternary': 'error',
+    },
+  },
+  {
+    // Reference/seed data is declarative and naturally long.
+    files: ['packages/server/src/data/**'],
+    rules: { 'max-lines': 'off', 'max-lines-per-function': 'off' },
+  },
 );

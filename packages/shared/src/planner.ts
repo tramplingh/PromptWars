@@ -1,4 +1,4 @@
-import { capabilityFit } from './allocation.js';
+import { capabilityFit } from './scoring.js';
 import { hasCapacity } from './availability.js';
 import type { Booking, Equipment, Lab, TimeSlot } from './domain.js';
 import { slotsOverlap, workingDays } from './time.js';
@@ -127,127 +127,137 @@ export function earliestSlot(search: SlotSearch): TimeSlot | null {
   return null;
 }
 
+/** Mutable working state while a project is being scheduled step by step. */
+interface PlanningState {
+  input: ScheduleInput;
+  horizonDays: number;
+  labById: ReadonlyMap<string, Lab>;
+  /** Campus bookings plus sessions already planned (for capacity). */
+  calendar: Booking[];
+  /** The student's own commitments plus planned sessions (no double-booking). */
+  userBusy: TimeSlot[];
+  /** End of each step; `null` when the step could not be scheduled. */
+  finished: Map<string, CalendarPoint | null>;
+}
+
+interface Candidate {
+  equipment: Equipment;
+  sessions: TimeSlot[];
+  finish: CalendarPoint;
+}
+
+const UNSCHEDULABLE = {
+  blocked: 'An earlier step it depends on could not be scheduled',
+  noDevice: 'No operational equipment on campus offers these capabilities',
+  noSlot: 'No free slot on suitable equipment before the deadline',
+} as const;
+
 /** Builds a feasible timetable for a whole project. */
 export function scheduleProject(input: ScheduleInput): ScheduleResult {
-  const horizonDays = input.horizonDays ?? PLAN_HORIZON_DAYS;
-  const labById = new Map(input.labs.map((l) => [l.id, l]));
-  const calendar: Booking[] = [...input.bookings];
-  const userBusy: TimeSlot[] = input.bookings
-    .filter((b) => b.userId === input.userId)
-    .map((b) => b.slot);
-  const finished = new Map<string, CalendarPoint | null>();
-  const results: StepSchedule[] = [];
-
-  for (const step of orderSteps(input.steps)) {
-    const blocked = step.dependsOn.find((d) => finished.get(d) === null);
-    if (blocked) {
-      results.push({
-        stepId: step.id,
-        status: 'unschedulable',
-        reason: 'An earlier step it depends on could not be scheduled',
-      });
-      finished.set(step.id, null);
-      continue;
-    }
-    const after = step.dependsOn.reduce<CalendarPoint>((point, d) => {
-      const end = finished.get(d);
-      return end ? later(point, end) : point;
-    }, input.from);
-
-    // The first requirement is the step's primary capability: a device must offer it to be
-    // considered (a 3D printer that is merely "high-precision" must never get a PCB-milling step).
-    const primary = step.requirements[0];
-    const operational = input.equipment.filter(
-      (e) =>
-        e.status === 'operational' && primary !== undefined && e.capabilities.includes(primary),
-    );
-    const bestFit = Math.max(0, ...operational.map((e) => capabilityFit(step.requirements, e)));
-    if (step.requirements.length === 0 || bestFit === 0) {
-      results.push({
-        stepId: step.id,
-        status: 'unschedulable',
-        reason: 'No operational equipment on campus offers these capabilities',
-      });
-      finished.set(step.id, null);
-      continue;
-    }
-
-    // Among the best-fitting devices, choose the one that finishes this step earliest.
-    let best: { equipment: Equipment; sessions: TimeSlot[] } | null = null;
-    for (const equipment of operational.filter(
-      (e) => capabilityFit(step.requirements, e) === bestFit,
-    )) {
-      const lab = labById.get(equipment.labId);
-      if (!lab) continue;
-      const sessions: TimeSlot[] = [];
-      let cursor = after;
-      for (const duration of splitHours(step.hours, equipment.maxHoursPerBooking)) {
-        const slot = earliestSlot({
-          equipment,
-          lab,
-          durationHours: duration,
-          after: cursor,
-          deadline: input.deadline,
-          calendar,
-          userBusy: [...userBusy, ...sessions],
-          horizonDays,
-        });
-        if (!slot) break;
-        sessions.push(slot);
-        cursor = endOf(slot);
-      }
-      if (sessions.length !== splitHours(step.hours, equipment.maxHoursPerBooking).length) continue;
-      const candidate = { equipment, sessions };
-      if (!best || compareCandidates(candidate, best) < 0) best = candidate;
-    }
-
-    if (!best) {
-      results.push({
-        stepId: step.id,
-        status: 'unschedulable',
-        reason: 'No free slot on suitable equipment before the deadline',
-      });
-      finished.set(step.id, null);
-      continue;
-    }
-
-    // Reserve the sessions so later steps (and capacity) see them.
-    for (const slot of best.sessions) {
-      calendar.push(reservation(best.equipment.id, input.userId, slot));
-      userBusy.push(slot);
-    }
-    finished.set(step.id, endOf(best.sessions[best.sessions.length - 1]!));
-    results.push({
-      stepId: step.id,
-      status: 'scheduled',
-      equipmentId: best.equipment.id,
-      fit: bestFit,
-      sessions: best.sessions,
-    });
-  }
-
-  const feasible = results.every((r) => r.status === 'scheduled');
-  const ends = [...finished.values()].filter((p): p is CalendarPoint => p !== null);
-  return {
-    steps: results,
-    feasible,
-    ...(feasible && ends.length > 0 && { finish: ends.reduce(later) }),
+  const state: PlanningState = {
+    input,
+    horizonDays: input.horizonDays ?? PLAN_HORIZON_DAYS,
+    labById: new Map(input.labs.map((l) => [l.id, l])),
+    calendar: [...input.bookings],
+    userBusy: input.bookings.filter((b) => b.userId === input.userId).map((b) => b.slot),
+    finished: new Map(),
   };
+  const steps = orderSteps(input.steps).map((step) => scheduleStep(step, state));
+  const feasible = steps.every((r) => r.status === 'scheduled');
+  const ends = [...state.finished.values()].filter((p): p is CalendarPoint => p !== null);
+  return { steps, feasible, ...(feasible && ends.length > 0 && { finish: ends.reduce(later) }) };
+}
+
+function scheduleStep(step: PlanStepInput, state: PlanningState): StepSchedule {
+  const fail = (reason: string): StepSchedule => {
+    state.finished.set(step.id, null);
+    return { stepId: step.id, status: 'unschedulable', reason };
+  };
+  if (step.dependsOn.some((d) => state.finished.get(d) === null))
+    return fail(UNSCHEDULABLE.blocked);
+
+  const { devices, fit } = bestFittingDevices(step, state.input.equipment);
+  if (devices.length === 0) return fail(UNSCHEDULABLE.noDevice);
+
+  const after = step.dependsOn.reduce<CalendarPoint>((point, d) => {
+    const end = state.finished.get(d);
+    return end ? later(point, end) : point;
+  }, state.input.from);
+  const best = devices
+    .map((equipment) => planOnDevice(step, equipment, after, state))
+    .filter((c): c is Candidate => c !== null)
+    .sort(compareCandidates)[0];
+  if (!best) return fail(UNSCHEDULABLE.noSlot);
+
+  // Reserve the sessions so later steps (and capacity checks) see them.
+  for (const slot of best.sessions) {
+    state.calendar.push(reservation(best.equipment.id, state.input.userId, slot));
+    state.userBusy.push(slot);
+  }
+  state.finished.set(step.id, best.finish);
+  return {
+    stepId: step.id,
+    status: 'scheduled',
+    equipmentId: best.equipment.id,
+    fit,
+    sessions: best.sessions,
+  };
+}
+
+/**
+ * Operational devices offering the step's primary (first) capability, narrowed
+ * to those with the best overall fit. A 3D printer that is merely
+ * "high-precision" must never receive a PCB-milling step.
+ */
+export function bestFittingDevices(
+  step: PlanStepInput,
+  equipment: readonly Equipment[],
+): { devices: Equipment[]; fit: number } {
+  const [primary] = step.requirements;
+  if (primary === undefined) return { devices: [], fit: 0 };
+  const offering = equipment.filter(
+    (e) => e.status === 'operational' && e.capabilities.includes(primary),
+  );
+  const fit = Math.max(0, ...offering.map((e) => capabilityFit(step.requirements, e)));
+  return { devices: offering.filter((e) => capabilityFit(step.requirements, e) === fit), fit };
+}
+
+/** Consecutive sessions for the whole step on one device, or null if they don't fit. */
+function planOnDevice(
+  step: PlanStepInput,
+  equipment: Equipment,
+  after: CalendarPoint,
+  state: PlanningState,
+): Candidate | null {
+  const lab = state.labById.get(equipment.labId);
+  if (!lab) return null;
+  const sessions: TimeSlot[] = [];
+  let cursor = after;
+  for (const durationHours of splitHours(step.hours, equipment.maxHoursPerBooking)) {
+    const slot = earliestSlot({
+      equipment,
+      lab,
+      durationHours,
+      after: cursor,
+      deadline: state.input.deadline,
+      calendar: state.calendar,
+      userBusy: [...state.userBusy, ...sessions],
+      horizonDays: state.horizonDays,
+    });
+    if (!slot) return null;
+    sessions.push(slot);
+    cursor = endOf(slot);
+  }
+  return { equipment, sessions, finish: cursor };
 }
 
 const comparePoints = (a: CalendarPoint, b: CalendarPoint) =>
   a.date.localeCompare(b.date) || a.hour - b.hour;
 
 /** Earlier finish wins; then instant-booking devices (no approval wait); then id for determinism. */
-function compareCandidates(
-  a: { equipment: Equipment; sessions: TimeSlot[] },
-  b: { equipment: Equipment; sessions: TimeSlot[] },
-): number {
+function compareCandidates(a: Candidate, b: Candidate): number {
   return (
-    comparePoints(
-      endOf(a.sessions[a.sessions.length - 1]!),
-      endOf(b.sessions[b.sessions.length - 1]!),
-    ) ||
+    comparePoints(a.finish, b.finish) ||
     Number(a.equipment.requiresApproval) - Number(b.equipment.requiresApproval) ||
     a.equipment.id.localeCompare(b.equipment.id)
   );

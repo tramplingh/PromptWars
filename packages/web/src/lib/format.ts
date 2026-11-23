@@ -72,5 +72,11 @@ export function splitByRecency(dates: string[], direction: 'past' | 'future') {
 
 export function greeting(): string {
   const hour = new Date().getHours();
-  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  if (hour < 12) return 'Good morning';
+  return hour < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+/** The browser's current date and minute-of-day, in the shape the shared check-in rules use. */
+export function localCampusTime(now = new Date()): { date: string; minutes: number } {
+  return { date: localDateOf(now.toISOString()), minutes: now.getHours() * 60 + now.getMinutes() };
 }

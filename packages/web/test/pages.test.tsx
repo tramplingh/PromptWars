@@ -193,7 +193,9 @@ describe('campus map', () => {
     renderWithProviders(<App />, { route: '/map' });
     const map = await screen.findByRole('group', { name: 'Campus map' });
     await userEvent.click(
-      within(map).getByRole('button', { name: 'ECE Block (your department), 1 item' }),
+      within(map).getByRole('button', {
+        name: /^ECE Block\s*· You \(your department\)\s*, 1 item$/,
+      }),
     );
     const panel = screen.getByRole('complementary', { name: 'ECE Block details' });
     expect(within(panel).getByRole('button', { name: /Oscilloscope/ })).toBeInTheDocument();

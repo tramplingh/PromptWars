@@ -459,7 +459,7 @@ export function buildSeedBookings(today: string, nowIso: string, hour = 10): Boo
     ...buildHistory(today, nowMs),
     ...yesterdayStory(today, nowMs),
     ...[...fixed, ...live].map((s): Booking => {
-      const date = s.day >= 0 ? upcoming[s.day]! : addDays(today, s.day);
+      const date = s.day >= 0 ? (upcoming[s.day] ?? today) : addDays(today, s.day);
       const decidedAt = new Date(
         nowMs - Math.max(0, s.createdHoursAgo - 1) * 3_600_000,
       ).toISOString();

@@ -15,48 +15,68 @@ export function CheckInPage() {
     equipmentId: params.get('e') ?? '',
     code: params.get('c') ?? '',
   });
+  const role = session?.persona?.role;
 
   const { mutate } = checkIn;
   useEffect(() => {
-    if (attempted.current || !parsed.success || session?.persona?.role !== 'student') return;
+    if (attempted.current || !parsed.success || role !== 'student') return;
     attempted.current = true;
     mutate(parsed.data);
-  }, [parsed, session, mutate]);
+  }, [parsed, role, mutate]);
 
   return (
     <div className="mx-auto max-w-md">
       <div className="card p-8 text-center" aria-live="polite">
         <h1 className="page-title">Check in</h1>
-        {!parsed.success ? (
-          <Result
-            ok={false}
-            title="This QR code isn’t valid"
-            detail="Scan the code on the lab display again."
-          />
-        ) : session?.persona && session.persona.role !== 'student' ? (
-          <Result
-            ok={false}
-            title="Switch to a student profile"
-            detail="Check-in is for students with a session on this device."
-          />
-        ) : checkIn.isPending || checkIn.isIdle ? (
-          <p className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-600">
-            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Checking you in…
-          </p>
-        ) : checkIn.isSuccess ? (
-          <Result
-            ok
-            title={`Checked in to ${checkIn.data.equipmentName}`}
-            detail={formatSlot(checkIn.data.slot)}
-          />
-        ) : (
-          <Result ok={false} title="Couldn’t check you in" detail={errorMessage(checkIn.error)} />
-        )}
+        <CheckInStatus validLink={parsed.success} role={role} checkIn={checkIn} />
         <Link to="/bookings" className="btn-secondary mt-6">
           Go to my bookings
         </Link>
       </div>
     </div>
+  );
+}
+
+function CheckInStatus({
+  validLink,
+  role,
+  checkIn,
+}: {
+  validLink: boolean;
+  role: string | undefined;
+  checkIn: ReturnType<typeof useCheckIn>;
+}) {
+  if (!validLink)
+    return (
+      <Result
+        ok={false}
+        title="This QR code isn’t valid"
+        detail="Scan the code on the lab display again."
+      />
+    );
+  if (role && role !== 'student') {
+    return (
+      <Result
+        ok={false}
+        title="Switch to a student profile"
+        detail="Check-in is for students with a session on this device."
+      />
+    );
+  }
+  if (checkIn.isSuccess)
+    return (
+      <Result
+        ok
+        title={`Checked in to ${checkIn.data.equipmentName}`}
+        detail={formatSlot(checkIn.data.slot)}
+      />
+    );
+  if (checkIn.isError)
+    return <Result ok={false} title="Couldn’t check you in" detail={errorMessage(checkIn.error)} />;
+  return (
+    <p className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-600">
+      <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Checking you in…
+    </p>
   );
 }
 

@@ -67,9 +67,10 @@ export class PlannerService {
       title: decomposition.title,
       summary: decomposition.summary,
       deadline: request.deadline,
-      steps: schedule.steps.map((result) => {
-        const step = byId.get(result.stepId)!;
-        return { ...step, schedule: result };
+      // Every scheduled step id comes from the decomposition, so the lookup always succeeds.
+      steps: schedule.steps.flatMap((result) => {
+        const step = byId.get(result.stepId);
+        return step ? [{ ...step, schedule: result }] : [];
       }),
       feasible: schedule.feasible,
       ...(schedule.finish && {

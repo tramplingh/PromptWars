@@ -2,11 +2,9 @@ import { formatHour, type DayAvailability, type HourCell } from '@lablink/shared
 import { memo } from 'react';
 import { localToday, weekdayLabel } from '../lib/format';
 
-export interface Selection {
-  date: string;
-  startHour: number;
-  hours: number;
-}
+import type { Selection } from '../lib/bookingValidation';
+
+export type { Selection };
 
 interface Props {
   days: DayAvailability[];
@@ -39,19 +37,19 @@ function describe(
 ): { short: string; long: string } {
   switch (state) {
     case 'free':
-      return { short: 'Free', long: 'available' };
+      return { short: 'Free', long: 'Free, available to book' };
     case 'partial':
       return {
         short: `${cell.free}/${units} free`,
-        long: `${cell.free} of ${units} units available`,
+        long: `${cell.free}/${units} free: ${cell.free} of ${units} units available`,
       };
     case 'requested':
       return {
         short: 'Requested',
-        long: 'requested by others — you can join the fair-allocation queue',
+        long: 'Requested by others — you can join the fair-allocation queue',
       };
     case 'booked':
-      return { short: 'Booked', long: 'fully booked' };
+      return { short: 'Booked', long: 'Booked, no units left' };
     case 'past':
       return { short: '—', long: 'in the past' };
   }
@@ -119,7 +117,7 @@ export const AvailabilityGrid = memo(function AvailabilityGrid({
                       type="button"
                       disabled={disabled}
                       aria-pressed={selected}
-                      aria-label={`${weekdayLabel(day.date)} ${formatHour(hour)}: ${text.long}`}
+                      aria-label={`${weekdayLabel(day.date)} ${formatHour(hour)}: ${selected ? 'Selected, ' : ''}${text.long}`}
                       onClick={() => onSelect(day.date, hour)}
                       className={`h-9 w-full rounded-md border text-xs font-medium transition ${
                         selected

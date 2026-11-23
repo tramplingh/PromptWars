@@ -46,15 +46,20 @@ export function ScoreBreakdown({ score }: { score: PriorityScore }) {
   );
 }
 
+/** Green for strong priority, brand for middling, grey for low. */
+export function scoreTone(total: number): string {
+  if (total >= 70) return 'bg-emerald-700';
+  return total >= 50 ? 'bg-brand-600' : 'bg-slate-500';
+}
+
 export function ScorePill({ score }: { score: PriorityScore }) {
-  const tone =
-    score.total >= 70 ? 'bg-emerald-600' : score.total >= 50 ? 'bg-brand-600' : 'bg-slate-500';
+  const tone = scoreTone(score.total);
   return (
     <span
       className={`inline-flex min-w-[3rem] flex-col items-center rounded-xl px-2 py-1 text-white ${tone}`}
     >
       <span className="text-lg font-bold leading-none tabular-nums">{score.total}</span>
-      <span className="text-[10px] font-medium uppercase tracking-wide opacity-90">priority</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide">priority</span>
     </span>
   );
 }

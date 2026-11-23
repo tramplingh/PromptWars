@@ -1,108 +1,18 @@
 import type {
   AiDraftResponse,
-  AiSource,
   AllocationPlan,
   ConflictExplanation,
   Equipment,
   Insight,
-  PlanStepInput,
   UtilisationReport,
 } from '@lablink/shared';
 import { formatHour, formatSlot } from '@lablink/shared';
+import { SYNONYMS, tokenize } from './language.js';
 
 /**
  * Deterministic fallbacks used when Gemini is not configured, times out or
  * returns invalid output. The product stays fully usable without AI.
  */
-
-const STOPWORDS = new Set([
-  'the',
-  'and',
-  'for',
-  'with',
-  'need',
-  'want',
-  'that',
-  'this',
-  'some',
-  'something',
-  'from',
-  'can',
-  'use',
-  'using',
-  'our',
-  'project',
-  'build',
-  'make',
-  'help',
-  'about',
-  'into',
-  'like',
-]);
-
-/** Everyday words mapped to catalogue capability tags. */
-const SYNONYMS: Record<string, string[]> = {
-  muscle: ['emg'],
-  emg: ['emg', 'biosignals'],
-  heart: ['ecg'],
-  ecg: ['ecg'],
-  brain: ['eeg'],
-  biomedical: ['biosignals'],
-  ml: ['deep-learning'],
-  ai: ['deep-learning', 'edge-ai'],
-  neural: ['deep-learning'],
-  train: ['model-training'],
-  training: ['model-training'],
-  model: ['model-training'],
-  print: ['3d-printing'],
-  printing: ['3d-printing'],
-  printer: ['3d-printing'],
-  cut: ['laser-cutting'],
-  cutting: ['laser-cutting'],
-  acrylic: ['laser-cutting'],
-  engrave: ['engraving'],
-  pcb: ['pcb-milling'],
-  circuit: ['pcb-milling', 'oscilloscope'],
-  debug: ['oscilloscope', 'protocol-decoding'],
-  i2c: ['protocol-decoding'],
-  spi: ['protocol-decoding'],
-  dna: ['pcr', 'dna-amplification'],
-  gene: ['pcr', 'genotyping'],
-  cell: ['cell-imaging', 'microscopy'],
-  cells: ['cell-imaging', 'microscopy'],
-  microscope: ['microscopy'],
-  antenna: ['antenna-testing'],
-  radio: ['rf'],
-  wireless: ['rf'],
-  signal: ['signal-analysis'],
-  signals: ['signal-analysis'],
-  robot: ['robotics'],
-  robotics: ['robotics'],
-  vision: ['computer-vision'],
-  camera: ['computer-vision'],
-  image: ['computer-vision', 'imaging'],
-  iot: ['sensors', 'microcontroller'],
-  sensor: ['sensors'],
-  sensors: ['sensors'],
-  vr: ['vr'],
-  virtual: ['vr'],
-  fpga: ['fpga'],
-  verilog: ['verilog'],
-  gpu: ['gpu'],
-  cuda: ['cuda'],
-  prototype: ['prototyping'],
-  enclosure: ['3d-printing'],
-  strength: ['tensile-testing'],
-  tensile: ['tensile-testing'],
-  wearable: ['wearables'],
-};
-
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2 && !STOPWORDS.has(t));
-}
 
 export function keywordSearch(
   query: string,
@@ -235,104 +145,4 @@ export function insightsFallback(report: UtilisationReport): Insight[] {
     });
   }
   return insights;
-}
-
-/**
- * Capability tags implied by free text (direct tag words plus everyday synonyms),
- * ordered by where they are first mentioned — students usually describe steps in order.
- */
-export function wantedTags(text: string, catalog: readonly Equipment[]): string[] {
-  const tokens = tokenize(text);
-  const vocabulary = new Set(catalog.flatMap((e) => e.capabilities));
-  const firstMention = new Map<string, number>();
-  tokens.forEach((token, position) => {
-    const candidates = [
-      ...(SYNONYMS[token] ?? []),
-      ...[...vocabulary].filter((tag) => token.length >= 3 && tag.split('-').includes(token)),
-    ];
-    for (const tag of candidates)
-      if (vocabulary.has(tag) && !firstMention.has(tag)) firstMention.set(tag, position);
-  });
-  return [...firstMention.entries()].sort((a, b) => a[1] - b[1]).map(([tag]) => tag);
-}
-
-const ACRONYMS: Record<string, string> = {
-  pcb: 'PCB',
-  rf: 'RF',
-  emg: 'EMG',
-  ecg: 'ECG',
-  eeg: 'EEG',
-  gpu: 'GPU',
-  cuda: 'CUDA',
-  fdm: 'FDM',
-  sla: 'SLA',
-  pcr: 'PCR',
-  vr: 'VR',
-  '3d': '3D',
-  ai: 'AI',
-  emi: 'EMI',
-  cnc: 'CNC',
-  hci: 'HCI',
-};
-
-/** "pcb-milling" → "PCB milling". */
-export function humanizeTag(tag: string): string {
-  const words = tag.split('-').map((w) => ACRONYMS[w] ?? w);
-  const first = words[0] ?? '';
-  return [
-    first === first.toLowerCase() ? first.charAt(0).toUpperCase() + first.slice(1) : first,
-    ...words.slice(1),
-  ].join(' ');
-}
-
-export interface Decomposition {
-  source: AiSource;
-  title: string;
-  summary: string;
-  steps: (PlanStepInput & { purpose: string })[];
-}
-
-/**
- * Rule-based project breakdown: greedily groups the mentioned capabilities by
- * the single device covering most of them (one step per machine), keeps the
- * order of first mention, and chains the steps sequentially.
- */
-export function decomposeFallback(
-  description: string,
-  catalog: readonly Equipment[],
-): Decomposition {
-  const operational = catalog.filter((e) => e.status === 'operational');
-  const remaining = wantedTags(description, catalog).filter((tag) =>
-    operational.some((e) => e.capabilities.includes(tag)),
-  );
-  const groups: string[][] = [];
-  while (remaining.length > 0 && groups.length < 6) {
-    // The earliest-mentioned remaining tag is the primary need of the next step.
-    const primary = remaining[0]!;
-    const device = operational
-      .filter((e) => e.capabilities.includes(primary))
-      .map((e) => ({ e, covered: remaining.filter((t) => e.capabilities.includes(t)) }))
-      .sort((a, b) => b.covered.length - a.covered.length)[0]!;
-    groups.push(device.covered.slice(0, 3));
-    for (const tag of device.covered) remaining.splice(remaining.indexOf(tag), 1);
-  }
-
-  const steps = groups.map((requirements, i) => ({
-    id: `s${i + 1}`,
-    title: humanizeTag(requirements[0]!),
-    purpose: `Needs ${requirements.join(', ')}.`,
-    requirements,
-    hours: 2,
-    dependsOn: i > 0 ? [`s${i}`] : [],
-  }));
-  const words = description.trim().split(/\s+/);
-  return {
-    source: 'fallback',
-    title: words
-      .slice(0, 7)
-      .join(' ')
-      .replace(/[.,;:!?]+$/, ''),
-    summary: description.trim().slice(0, 600),
-    steps,
-  };
 }

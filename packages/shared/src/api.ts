@@ -1,4 +1,5 @@
-import type { Alternative, AllocationPlan, PriorityScore } from './allocation.js';
+import type { Alternative, AllocationPlan } from './allocation.js';
+import type { PriorityScore } from './scoring.js';
 import type { DayAvailability } from './availability.js';
 import type { Booking, Department, Equipment, Lab, Persona, TimeSlot } from './domain.js';
 import type { CalendarPoint, StepSchedule } from './planner.js';
