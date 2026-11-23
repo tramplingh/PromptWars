@@ -61,7 +61,7 @@ flowchart LR
   UI -->|/api/*  JSON + signed cookie| FN
   FN --> ENG[Fair-share engine<br/>@lablink/shared]
   FN -->|Admin SDK, transactions| FS[(Cloud Firestore)]
-  FN -->|structured JSON output| GEM[Gemini 2.5 Flash]
+  FN -->|structured JSON output| GEM[Gemini 3.1 Flash-Lite]
 ```
 
 **Student flow:** the dashboard shows upcoming bookings, pending decisions, reallocations and a **fair-share usage meter** → search in plain English, filter the catalogue or browse the **campus map** (green = free now) → open a device → pick a start time on the grid → describe the idea and click **Draft my request** (Gemini) → submit. The server decides the outcome atomically:
@@ -79,7 +79,7 @@ flowchart LR
 
 | Service                                  | How it is used                                                                                          | Why it matters                                                                                                                                                                   |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini 2.5 Flash** (`@google/genai`)   | Natural-language equipment search, request drafting, conflict explanations, utilisation recommendations | Uses **structured JSON output** with a schema, validated again with Zod; responses are grounded in catalogue data; thinking budget 0 for low latency; 8s timeout; results cached |
+| **Gemini 3.1 Flash-Lite** (`@google/genai`, configurable via `GEMINI_MODEL`) | Natural-language equipment search, request drafting, conflict explanations, utilisation recommendations | Uses **structured JSON output** with a schema, validated again with Zod; responses are grounded in catalogue data; thinking budget 0 for low latency; 8s timeout; results cached |
 | **Cloud Firestore** (Firebase Admin SDK) | Durable booking storage on serverless hosting                                                           | Capacity checks run in **Firestore transactions**, so two students can never both win a slot. Only the server accesses Firestore (no client SDK, no public rules surface)        |
 | **Google AI Studio**                     | API key provisioning                                                                                    | —                                                                                                                                                                                |
 

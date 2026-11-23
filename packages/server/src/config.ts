@@ -7,7 +7,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(8080),
   GEMINI_API_KEY: z.string().trim().optional(),
-  GEMINI_MODEL: z.string().trim().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().trim().default('gemini-3.1-flash-lite'),
   GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
   SESSION_SECRET: z.string().optional(),
   DATA_BACKEND: z.enum(['memory', 'firestore']).default('memory'),

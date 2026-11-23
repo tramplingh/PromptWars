@@ -10,9 +10,11 @@ export interface GeminiOptions {
 /** Gemini implementation using structured JSON output and a hard timeout. */
 export class GeminiClient implements LlmClient {
   private readonly ai: GoogleGenAI;
+  readonly model: string;
 
   constructor(private readonly options: GeminiOptions) {
     this.ai = new GoogleGenAI({ apiKey: options.apiKey });
+    this.model = options.model;
   }
 
   async generateJson<T>(request: JsonGenerationRequest<T>): Promise<T> {

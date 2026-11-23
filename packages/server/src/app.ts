@@ -77,7 +77,7 @@ export function createApp(services: Services, options: AppOptions = {}): Express
   api.use(attachPersona(services.signer, services.catalog));
 
   api.get('/health', (_req, res) => {
-    res.json({ status: 'ok', ai: services.ai.enabled });
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', ai: services.ai.status() });
   });
   api.use(sessionRoutes(services));
   api.use(catalogRoutes(services));

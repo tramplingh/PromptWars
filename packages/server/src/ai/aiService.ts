@@ -60,8 +60,17 @@ const obj = (properties: Record<string, unknown>) => ({
  * GenAI features. Every method is grounded in LabLink data, validated against a
  * schema, cached, and degrades gracefully to a deterministic fallback.
  */
+export interface AiStatus {
+  configured: boolean;
+  model: string | null;
+  lastSuccessAt: string | null;
+  lastFailure: { at: string; reason: string } | null;
+}
+
 export class AiService {
   private readonly cache = new TtlCache<unknown>();
+  private lastSuccessAt: string | null = null;
+  private lastFailure: AiStatus['lastFailure'] = null;
 
   constructor(
     private readonly llm: LlmClient | null,
@@ -71,6 +80,16 @@ export class AiService {
 
   get enabled(): boolean {
     return this.llm !== null;
+  }
+
+  /** Operator visibility: is Gemini configured, and is it actually answering? */
+  status(): AiStatus {
+    return {
+      configured: this.enabled,
+      model: this.llm?.model ?? null,
+      lastSuccessAt: this.lastSuccessAt,
+      lastFailure: this.lastFailure,
+    };
   }
 
   async search(query: string): Promise<AiSearchResponse> {
@@ -214,12 +233,15 @@ export class AiService {
     try {
       const value = await call(this.llm);
       this.cache.set(key, value);
+      this.lastSuccessAt = new Date().toISOString();
       return value;
     } catch (error) {
-      // Log the failure class only — never prompts or user text.
-      this.log.warn(
-        `[ai] ${String(keyParts[0])} fell back to rules: ${error instanceof Error ? error.name : 'unknown error'}`,
-      );
+      // Provider errors carry status codes and reasons, never our prompts or user text.
+      const reason = (
+        error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error'
+      ).slice(0, 200);
+      this.lastFailure = { at: new Date().toISOString(), reason };
+      this.log.warn(`[ai] ${String(keyParts[0])} fell back to rules — ${reason}`);
       return fallback();
     }
   }

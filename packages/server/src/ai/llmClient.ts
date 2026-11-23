@@ -14,6 +14,8 @@ export interface JsonGenerationRequest<T> {
 
 /** Provider-agnostic structured-output LLM client (Gemini in production, fakes in tests). */
 export interface LlmClient {
+  /** Model identifier, reported by the health endpoint. */
+  readonly model?: string;
   generateJson<T>(request: JsonGenerationRequest<T>): Promise<T>;
 }
 

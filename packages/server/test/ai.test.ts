@@ -4,7 +4,8 @@ import { AiService } from '../src/ai/aiService.js';
 import { keywordSearch } from '../src/ai/fallbacks.js';
 import { wrapUserInput, type JsonGenerationRequest, type LlmClient } from '../src/ai/llmClient.js';
 import { equipment } from '../src/data/catalog.js';
-import { buildTestServices } from './helpers.js';
+import request from 'supertest';
+import { buildTestApp, buildTestServices } from './helpers.js';
 
 function fakeLlm(
   respond: (req: JsonGenerationRequest<unknown>) => unknown,
@@ -20,6 +21,34 @@ function fakeLlm(
 }
 
 const catalogOf = () => buildTestServices().catalog;
+
+describe('AI health status', () => {
+  it('reports successes and the reason for the latest failure', async () => {
+    let fail = false;
+    const llm = fakeLlm(() => {
+      if (fail) throw new Error('404 model is no longer available');
+      return { results: [] };
+    });
+    const ai = new AiService(llm, catalogOf(), { warn: () => undefined });
+    expect(ai.status()).toMatchObject({ configured: true, lastSuccessAt: null, lastFailure: null });
+
+    await ai.search('oscilloscope');
+    expect(ai.status().lastSuccessAt).not.toBeNull();
+
+    fail = true;
+    await ai.search('a different query');
+    expect(ai.status().lastFailure?.reason).toBe('Error: 404 model is no longer available');
+  });
+
+  it('is visible on the public health endpoint', async () => {
+    const { app } = buildTestApp();
+    const res = await request(app).get('/api/health').expect(200);
+    expect(res.body).toEqual({
+      status: 'ok',
+      ai: { configured: false, model: null, lastSuccessAt: null, lastFailure: null },
+    });
+  });
+});
 
 describe('AiService with Gemini', () => {
   it('keeps only catalogue ids the model returns (no hallucinated equipment)', async () => {
