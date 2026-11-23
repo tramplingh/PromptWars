@@ -72,15 +72,13 @@ export function errorHandler(log: Pick<Console, 'error'>) {
       return;
     }
     if (error instanceof ZodError) {
-      res
-        .status(400)
-        .json({
-          error: {
-            code: 'BAD_REQUEST',
-            message: 'Invalid request',
-            details: z.flattenError(error),
-          },
-        });
+      res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Invalid request',
+          details: z.flattenError(error),
+        },
+      });
       return;
     }
     // body-parser errors (malformed JSON, payload too large) carry a status.

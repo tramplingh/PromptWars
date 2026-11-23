@@ -1,18 +1,34 @@
 import {
+  daysBetween,
   formatHour,
   formatSlot,
   type AllocationPlan,
   type ConflictExplanation,
   type ScoredBooking,
 } from '@lablink/shared';
-import { ArrowRight, Check, GitCompareArrows, Loader2, Scale, Sparkles, X } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarClock,
+  Check,
+  Clock3,
+  GitCompareArrows,
+  Inbox,
+  Loader2,
+  Scale,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import { AiSourceBadge } from '../components/Badges';
 import { ScoreBreakdown, ScorePill } from '../components/ScoreBreakdown';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
 import { errorMessage } from '../lib/api';
-import { longDate, relativeTime } from '../lib/format';
+import { localDateOf, localToday, longDate, relativeTime, splitByRecency } from '../lib/format';
+import { StatTile } from '../components/ui/StatTile';
+
+/** Requests whose deadline is this close are flagged urgent. */
+const URGENT_DAYS = 3;
 import {
   useApplyPlan,
   useApprovals,
@@ -32,18 +48,50 @@ export function ApprovalsPage() {
 
   const { conflicts, pending } = queue.data;
   const standalone = pending.filter((p) => !p.conflictId);
+  const today = localToday();
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold sm:text-3xl">Approvals</h1>
-        <p className="mt-1 text-slate-600">
+        <h1 className="page-title">Approvals</h1>
+        <p className="mt-1 text-sm text-slate-600">
           {persona?.role === 'admin'
             ? 'All departments'
             : 'Requests for equipment in your department'}{' '}
           · ranked by a transparent fair-share score.
         </p>
       </header>
+
+      <ul className="grid gap-4 sm:grid-cols-3" aria-label="Approval pipeline">
+        <StatTile
+          label="Awaiting approval"
+          icon={<Clock3 aria-hidden="true" className="h-4 w-4" />}
+          urgent={
+            pending.filter((p) => daysBetween(today, p.project.deadline) <= URGENT_DAYS).length
+          }
+          splits={splitByRecency(
+            pending.map((p) => localDateOf(p.createdAt)),
+            'past',
+          )}
+        />
+        <StatTile
+          label="In conflict"
+          icon={<GitCompareArrows aria-hidden="true" className="h-4 w-4" />}
+          hint="Requests competing for the same slot, grouped by slot date"
+          splits={splitByRecency(
+            conflicts.map((c) => c.conflict.date),
+            'future',
+          )}
+        />
+        <StatTile
+          label="Standalone requests"
+          icon={<Inbox aria-hidden="true" className="h-4 w-4" />}
+          splits={splitByRecency(
+            standalone.map((p) => p.slot.date),
+            'future',
+          )}
+        />
+      </ul>
 
       <section aria-labelledby="conflicts-title" className="space-y-4">
         <h2 id="conflicts-title" className="section-title flex items-center gap-2">
@@ -93,16 +141,23 @@ function ConflictCard({ plan, pending }: { plan: AllocationPlan; pending: Scored
     explanation?.perStudent.find((p) => p.bookingId === bookingId)?.message;
 
   return (
-    <article aria-labelledby={titleId} className="card overflow-hidden">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 bg-amber-50/60 p-5">
+    <article
+      aria-labelledby={titleId}
+      className="card overflow-hidden border-l-4 border-l-amber-500"
+    >
+      <p className="flex items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-600">
+        <CalendarClock aria-hidden="true" className="h-3.5 w-3.5" /> Contested slot ·{' '}
+        {longDate(plan.conflict.date)}, {formatHour(plan.conflict.startHour)}–
+        {formatHour(plan.conflict.endHour)}
+      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
         <div>
           <h3 id={titleId} className="font-semibold">
             {equipment?.name}
           </h3>
           <p className="text-sm text-slate-700">
-            {longDate(plan.conflict.date)} · {formatHour(plan.conflict.startHour)}–
-            {formatHour(plan.conflict.endHour)} · {plan.decisions.length} overlapping requests for{' '}
-            {equipment?.units} unit{equipment && equipment.units > 1 ? 's' : ''}
+            {plan.decisions.length} overlapping requests for {equipment?.units} unit
+            {equipment && equipment.units > 1 ? 's' : ''}
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-slate-800">
             <Scale aria-hidden="true" className="h-4 w-4 text-brand-600" /> Recommendation:{' '}

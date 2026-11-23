@@ -37,3 +37,40 @@ export function relativeTime(iso: string): string {
   if (hours < 48) return `${hours}h ago`;
   return `${Math.round(hours / 24)} days ago`;
 }
+
+/** Local calendar date (YYYY-MM-DD) of an ISO timestamp. */
+export function localDateOf(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Splits dates into Today / This week / Older (past-facing, e.g. request times)
+ * or Today / This week / Later (future-facing, e.g. slot dates) — 7-day windows.
+ */
+export function splitByRecency(dates: string[], direction: 'past' | 'future') {
+  const today = localToday();
+  const dayMs = 86_400_000;
+  const diff = (date: string) =>
+    Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / dayMs);
+  let todayCount = 0;
+  let week = 0;
+  let rest = 0;
+  for (const date of dates) {
+    const d = direction === 'past' ? -diff(date) : diff(date);
+    if (d <= 0) todayCount++;
+    else if (d < 7) week++;
+    else rest++;
+  }
+  return [
+    { label: 'Today', value: todayCount },
+    { label: 'This week', value: week },
+    { label: direction === 'past' ? 'Older' : 'Later', value: rest },
+  ];
+}
+
+export function greeting(): string {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+}

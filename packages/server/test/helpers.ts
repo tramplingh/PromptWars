@@ -8,6 +8,7 @@ import { buildSeedBookings } from '../src/data/seedBookings.js';
 import { SessionSigner } from '../src/http/session.js';
 import { fixedClock } from '../src/lib/clock.js';
 import { MemoryBookingRepository } from '../src/repositories/memoryBookingRepository.js';
+import { ActivityService } from '../src/services/activityService.js';
 import { ApprovalService } from '../src/services/approvalService.js';
 import { BookingService } from '../src/services/bookingService.js';
 import { CatalogService } from '../src/services/catalogService.js';
@@ -33,6 +34,7 @@ export function buildTestServices(
     bookings,
     approvals: new ApprovalService(repo, catalog, bookings, clock),
     insights: new InsightsService(repo, catalog, clock),
+    activity: new ActivityService(repo, catalog, clock),
     ai: new AiService(options.llm ?? null, catalog, { warn: () => undefined }),
     signer: new SessionSigner('test-secret-that-is-at-least-32-characters-long'),
     clock,

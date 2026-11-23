@@ -25,8 +25,8 @@ export function MyBookingsPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold sm:text-3xl">My bookings</h1>
-        <p className="mt-1 text-slate-600">
+        <h1 className="page-title">My bookings</h1>
+        <p className="mt-1 text-sm text-slate-600">
           Track requests, approvals and any fair-share reallocations.
         </p>
       </header>
@@ -67,6 +67,14 @@ export function MyBookingsPage() {
   );
 }
 
+/** Left-border accent per status, mirroring the colour of the status badge. */
+const STATUS_ACCENT: Record<BookingView['status'], string> = {
+  approved: 'border-l-emerald-500',
+  pending: 'border-l-amber-500',
+  rejected: 'border-l-rose-500',
+  cancelled: 'border-l-slate-300',
+};
+
 function BookingRow({
   booking,
   cancellable = false,
@@ -81,7 +89,9 @@ function BookingRow({
   const from = booking.reallocatedFrom;
 
   return (
-    <li className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+    <li
+      className={`card flex flex-col gap-4 border-l-4 p-5 sm:flex-row sm:items-center ${STATUS_ACCENT[booking.status]}`}
+    >
       <div className="flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={booking.status} />

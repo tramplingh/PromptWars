@@ -5,7 +5,7 @@ import {
   type Lab,
   type TimeSlot,
 } from './domain.js';
-import { compareSlots, workingDays } from './time.js';
+import { compareSlots, isWeekend, workingDays } from './time.js';
 
 export interface HourCell {
   hour: number;
@@ -129,4 +129,46 @@ function dayIndex(date: string): number {
 
 function range(start: number, end: number): number[] {
   return Array.from({ length: Math.max(0, end - start) }, (_, i) => start + i);
+}
+
+export type LiveState = 'available' | 'requested' | 'in-use' | 'closed' | 'maintenance';
+
+export interface LiveStatus {
+  equipmentId: string;
+  state: LiveState;
+  /** Units bookable right now (0 unless state is available). */
+  freeUnits: number;
+  /** For in-use equipment: first hour later today with a free unit, if any. */
+  freeFromHour?: number;
+}
+
+/**
+ * Real-time status of one item at a campus-local date and hour. "In use"
+ * counts only approved bookings; "requested" means every free unit is
+ * claimed by pending requests awaiting a decision.
+ */
+export function liveStatus(
+  equipment: Equipment,
+  lab: Lab,
+  bookings: readonly Booking[],
+  date: string,
+  hour: number,
+): LiveStatus {
+  const base = { equipmentId: equipment.id, freeUnits: 0 };
+  if (equipment.status === 'maintenance') return { ...base, state: 'maintenance' };
+  if (isWeekend(date) || hour < lab.openHour || hour >= lab.closeHour)
+    return { ...base, state: 'closed' };
+
+  const own = bookings.filter((b) => b.equipmentId === equipment.id);
+  const approved = own.filter((b) => b.status === 'approved');
+  if (occupancy(approved, date, hour) >= equipment.units) {
+    const freeFromHour = range(hour + 1, lab.closeHour).find(
+      (h) => occupancy(approved, date, h) < equipment.units,
+    );
+    return { ...base, state: 'in-use', ...(freeFromHour !== undefined && { freeFromHour }) };
+  }
+  const freeUnits = equipment.units - occupancy(own, date, hour);
+  return freeUnits > 0
+    ? { ...base, state: 'available', freeUnits }
+    : { ...base, state: 'requested' };
 }

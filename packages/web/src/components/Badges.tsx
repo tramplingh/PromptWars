@@ -54,8 +54,8 @@ export function AiSourceBadge({ source }: { source: AiSource }) {
 
 export function ApprovalBadge({ requiresApproval }: { requiresApproval: boolean }) {
   return requiresApproval ? (
-    <span className="chip border-amber-200 bg-amber-50 text-amber-800">Faculty approval</span>
+    <span className="chip border-slate-200 bg-white text-slate-700">Needs approval</span>
   ) : (
-    <span className="chip border-emerald-200 bg-emerald-50 text-emerald-800">Instant booking</span>
+    <span className="chip border-slate-200 bg-white text-slate-700">Instant booking</span>
   );
 }

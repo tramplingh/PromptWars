@@ -1,4 +1,5 @@
 import type {
+  ActivityEvent,
   AiDraftResponse,
   AiSearchResponse,
   ApplyPlanResponse,
@@ -11,6 +12,7 @@ import type {
   DecisionInput,
   EquipmentDetail,
   InsightsResponse,
+  LiveStatus,
   Persona,
   SessionInfo,
   UtilisationReport,
@@ -29,6 +31,9 @@ export const keys = {
   approvals: ['approvals'] as const,
   utilisation: ['insights', 'utilisation'] as const,
   recommendations: ['insights', 'recommendations'] as const,
+  // Nested under 'equipment' so booking mutations invalidate it with the calendars.
+  liveStatus: ['equipment', 'live-status'] as const,
+  activity: ['activity'] as const,
 };
 
 const STATIC = { staleTime: 5 * 60_000 };
@@ -60,6 +65,27 @@ export const useEquipmentDetail = (id: string, from?: string) =>
       ),
     // Keep the previous week visible while the next one loads (no layout flash).
     placeholderData: (previous) => previous,
+  });
+
+/** Live state of every item; refreshed each minute while the tab is visible. */
+export function useLiveStatus() {
+  const query = useQuery({
+    queryKey: keys.liveStatus,
+    queryFn: () => api.get<LiveStatus[]>('/equipment/status'),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+  const byId = useMemo(() => new Map(query.data?.map((s) => [s.equipmentId, s])), [query.data]);
+  return { ...query, byId };
+}
+
+export const useActivity = (enabled: boolean) =>
+  useQuery({
+    queryKey: keys.activity,
+    queryFn: () => api.get<ActivityEvent[]>('/activity'),
+    enabled,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
 export const useMyBookings = (enabled: boolean) =>
@@ -110,8 +136,8 @@ function useInvalidateBookingData() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      [['equipment'], keys.myBookings, keys.approvals, ['insights']].map((queryKey) =>
-        client.invalidateQueries({ queryKey }),
+      [['equipment'], keys.myBookings, keys.approvals, ['insights'], keys.activity].map(
+        (queryKey) => client.invalidateQueries({ queryKey }),
       ),
     );
 }

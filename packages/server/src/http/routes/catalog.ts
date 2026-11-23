@@ -12,6 +12,13 @@ export function catalogRoutes({ catalog, bookings }: Services): Router {
   });
 
   router.get(
+    '/equipment/status',
+    asyncHandler(async (_req, res) => {
+      res.set('Cache-Control', 'no-store').json(await bookings.liveStatuses());
+    }),
+  );
+
+  router.get(
     '/equipment/:id',
     asyncHandler(async (req, res) => {
       const { from, days } = parse(availabilityQuerySchema, req.query);

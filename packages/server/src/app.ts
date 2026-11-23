@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import path from 'node:path';
 import { notFound } from './lib/errors.js';
 import { attachPersona, errorHandler, requireJsonForMutations } from './http/middleware.js';
+import { activityRoutes } from './http/routes/activity.js';
 import { aiRoutes } from './http/routes/ai.js';
 import { approvalRoutes } from './http/routes/approvals.js';
 import { bookingRoutes } from './http/routes/bookings.js';
@@ -83,6 +84,7 @@ export function createApp(services: Services, options: AppOptions = {}): Express
   api.use(bookingRoutes(services));
   api.use(approvalRoutes(services));
   api.use(insightsRoutes(services));
+  api.use(activityRoutes(services));
   api.use(aiRoutes(services));
   api.use((_req, _res, next) => next(notFound('Endpoint')));
 

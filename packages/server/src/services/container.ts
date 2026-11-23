@@ -1,4 +1,5 @@
 import type { AiService } from '../ai/aiService.js';
+import type { ActivityService } from './activityService.js';
 import type { SessionSigner } from '../http/session.js';
 import type { Clock } from '../lib/clock.js';
 import type { ApprovalService } from './approvalService.js';
@@ -12,6 +13,7 @@ export interface Services {
   bookings: BookingService;
   approvals: ApprovalService;
   insights: InsightsService;
+  activity: ActivityService;
   ai: AiService;
   signer: SessionSigner;
   clock: Clock;

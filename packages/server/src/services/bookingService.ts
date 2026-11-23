@@ -7,6 +7,7 @@ import {
   formatSlot,
   hasCapacity,
   isWeekend,
+  liveStatus,
   slotHours,
   slotsOverlap,
   withinOpeningHours,
@@ -17,6 +18,7 @@ import {
   type CreateBookingInput,
   type Equipment,
   type EquipmentDetail,
+  type LiveStatus,
   type Persona,
 } from '@lablink/shared';
 import type { Clock } from '../lib/clock.js';
@@ -54,6 +56,16 @@ export class BookingService {
       department: this.catalog.department(equipment.departmentId),
       availability: computeAvailability(equipment, lab, bookings, from ?? this.clock.today(), days),
     };
+  }
+
+  /** Real-time status of every catalogue item, for the map and catalogue pills. */
+  async liveStatuses(): Promise<LiveStatus[]> {
+    const active = await this.repo.list({ statuses: ACTIVE_STATUSES });
+    const today = this.clock.today();
+    const hour = this.clock.hour();
+    return this.catalog.equipment.map((e) =>
+      liveStatus(e, this.catalog.labFor(e), active, today, hour),
+    );
   }
 
   async listForUser(userId: string): Promise<BookingView[]> {

@@ -1,5 +1,14 @@
 import { addDays, formatHour, type Alternative, type ProjectInput } from '@lablink/shared';
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, MapPin, Users, Wrench } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
+  Timer,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -11,7 +20,8 @@ import { ApprovalBadge } from '../components/Badges';
 import { BookingForm } from '../components/BookingForm';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ErrorState, Loading } from '../components/States';
-import { useEquipmentDetail, useSession } from '../lib/queries';
+import { LiveStatusPill } from '../components/ui/LiveStatusPill';
+import { useEquipmentDetail, useLiveStatus, useSession } from '../lib/queries';
 
 interface PrefillState {
   selection?: Selection;
@@ -36,6 +46,7 @@ function EquipmentPage({ id }: { id: string }) {
   const detail = useEquipmentDetail(id, from);
   const { data: session } = useSession();
   const isStudent = session?.persona?.role === 'student';
+  const { byId: live } = useLiveStatus();
 
   const onSelect = useCallback(
     (date: string, startHour: number) =>
@@ -69,55 +80,64 @@ function EquipmentPage({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <Link
-        to="/"
+        to="/equipment"
         className="inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-brand-700 hover:underline"
       >
-        <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to catalogue
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" /> All equipment
       </Link>
 
-      <header className="card flex flex-col gap-5 p-6 sm:flex-row sm:items-start">
-        <CategoryIcon category={equipment.category} size="lg" />
-        <div className="flex-1 space-y-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <header className="card overflow-hidden">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+          <CategoryIcon category={equipment.category} size="lg" />
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">
               {department.name} · {equipment.category}
             </p>
-            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{equipment.name}</h1>
+            <h1 className="page-title mt-1">{equipment.name}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">{equipment.description}</p>
+            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Capabilities">
+              {equipment.capabilities.map((c) => (
+                <li key={c} className="chip border-slate-200 bg-slate-50 text-slate-700">
+                  {c}
+                </li>
+              ))}
+            </ul>
           </div>
-          <p className="max-w-3xl text-slate-700">{equipment.description}</p>
-          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-700">
-            <div className="flex items-center gap-1.5">
-              <MapPin aria-hidden="true" className="h-4 w-4 text-slate-500" />
-              <dt className="sr-only">Location</dt>
-              <dd>
-                {lab.name}, {lab.location}
-              </dd>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock aria-hidden="true" className="h-4 w-4 text-slate-500" />
-              <dt className="sr-only">Opening hours</dt>
-              <dd>
-                {formatHour(lab.openHour)}–{formatHour(lab.closeHour)}, Mon–Fri
-              </dd>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Users aria-hidden="true" className="h-4 w-4 text-slate-500" />
-              <dt className="sr-only">Units</dt>
-              <dd>
-                {equipment.units} unit{equipment.units > 1 ? 's' : ''} · max{' '}
-                {equipment.maxHoursPerBooking}h per booking
-              </dd>
-            </div>
-          </dl>
-          <div className="flex flex-wrap gap-1.5">
-            <ApprovalBadge requiresApproval={equipment.requiresApproval} />
-            {equipment.capabilities.map((c) => (
-              <span key={c} className="chip border-slate-200 bg-slate-50 text-slate-700">
-                {c}
-              </span>
-            ))}
+          <div className="flex shrink-0 flex-wrap gap-1.5 sm:flex-col sm:items-end">
+            <LiveStatusPill status={live.get(equipment.id)} />
+            {equipment.status === 'operational' && (
+              <ApprovalBadge requiresApproval={equipment.requiresApproval} />
+            )}
           </div>
         </div>
+        <dl className="grid grid-cols-2 divide-slate-200 border-t border-slate-200 bg-slate-50/60 sm:grid-cols-4 sm:divide-x">
+          {[
+            { icon: MapPin, label: 'Location', value: `${lab.name}, ${lab.location}` },
+            {
+              icon: Clock,
+              label: 'Opening hours',
+              value: `${formatHour(lab.openHour)}–${formatHour(lab.closeHour)}, Mon–Fri`,
+            },
+            {
+              icon: Users,
+              label: 'Units',
+              value: `${equipment.units} identical unit${equipment.units > 1 ? 's' : ''}`,
+            },
+            {
+              icon: Timer,
+              label: 'Max per booking',
+              value: `${equipment.maxHoursPerBooking} hours`,
+            },
+          ].map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-start gap-2.5 px-5 py-3">
+              <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+              <div className="min-w-0">
+                <dt className="text-2xs text-slate-500">{label}</dt>
+                <dd className="truncate text-sm font-medium text-ink">{value}</dd>
+              </div>
+            </div>
+          ))}
+        </dl>
       </header>
 
       {equipment.status === 'maintenance' ? (
@@ -131,12 +151,9 @@ function EquipmentPage({ id }: { id: string }) {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
-          <section
-            aria-labelledby="availability-title"
-            className="card space-y-4 p-5 lg:col-span-3"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="availability-title" className="section-title">
+          <section aria-labelledby="availability-title" className="card min-w-0 lg:col-span-3">
+            <div className="card-header">
+              <h2 id="availability-title" className="card-title">
                 Availability
               </h2>
               <div className="flex items-center gap-2">
@@ -166,35 +183,42 @@ function EquipmentPage({ id }: { id: string }) {
                 </button>
               </div>
             </div>
-            <AvailabilityLegend />
-            <AvailabilityGrid
-              days={availability}
-              units={equipment.units}
-              selection={selection}
-              onSelect={onSelect}
-            />
+            <div className="space-y-4 p-5">
+              <AvailabilityLegend />
+              <AvailabilityGrid
+                days={availability}
+                units={equipment.units}
+                selection={selection}
+                onSelect={onSelect}
+              />
+            </div>
           </section>
 
-          <section aria-labelledby="request-title" className="card p-5 lg:col-span-2">
-            <h2 id="request-title" className="section-title mb-4">
+          <section
+            aria-labelledby="request-title"
+            className="card min-w-0 self-start lg:col-span-2"
+          >
+            <h2 id="request-title" className="card-header card-title">
               {equipment.requiresApproval ? 'Request access' : 'Book a slot'}
             </h2>
-            {isStudent ? (
-              <BookingForm
-                key={equipment.id}
-                equipment={equipment}
-                lab={lab}
-                selection={selection}
-                initialProject={prefill.project}
-                onHoursChange={(hours) => setSelection((s) => (s ? { ...s, hours } : s))}
-                onUseAlternative={useAlternative}
-              />
-            ) : (
-              <p className="text-sm text-slate-600">
-                Bookings are made by students. Switch to a student profile in the header to try the
-                booking flow.
-              </p>
-            )}
+            <div className="p-5">
+              {isStudent ? (
+                <BookingForm
+                  key={equipment.id}
+                  equipment={equipment}
+                  lab={lab}
+                  selection={selection}
+                  initialProject={prefill.project}
+                  onHoursChange={(hours) => setSelection((s) => (s ? { ...s, hours } : s))}
+                  onUseAlternative={useAlternative}
+                />
+              ) : (
+                <p className="text-sm text-slate-600">
+                  Bookings are made by students. Switch to a student profile in the header to try
+                  the booking flow.
+                </p>
+              )}
+            </div>
           </section>
         </div>
       )}

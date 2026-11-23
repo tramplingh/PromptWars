@@ -25,11 +25,11 @@ function cellState(cell: HourCell, units: number, isPast: boolean): CellState {
 }
 
 const STATE_STYLE: Record<CellState, string> = {
-  free: 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-200',
-  partial: 'bg-lime-50 text-lime-800 hover:bg-lime-100 border-lime-200',
+  free: 'bg-white text-emerald-800 hover:bg-emerald-50 hover:border-emerald-400 border-emerald-200',
+  partial: 'bg-teal-50 text-teal-800 hover:bg-teal-100 border-teal-200',
   requested: 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200',
   booked: 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed',
-  past: 'bg-white text-slate-400 border-slate-100 cursor-not-allowed',
+  past: 'bg-slate-50 text-slate-400 border-transparent cursor-not-allowed',
 };
 
 function describe(
@@ -121,7 +121,7 @@ export const AvailabilityGrid = memo(function AvailabilityGrid({
                       aria-pressed={selected}
                       aria-label={`${weekdayLabel(day.date)} ${formatHour(hour)}: ${text.long}`}
                       onClick={() => onSelect(day.date, hour)}
-                      className={`h-10 w-full rounded-lg border text-xs font-medium transition ${
+                      className={`h-9 w-full rounded-md border text-xs font-medium transition ${
                         selected
                           ? 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700'
                           : STATE_STYLE[state]
@@ -142,8 +142,8 @@ export const AvailabilityGrid = memo(function AvailabilityGrid({
 
 export function AvailabilityLegend() {
   const items: [string, string][] = [
-    ['bg-emerald-100 border-emerald-300', 'Free'],
-    ['bg-lime-100 border-lime-300', 'Some units free'],
+    ['bg-white border-emerald-300', 'Free'],
+    ['bg-teal-100 border-teal-300', 'Some units free'],
     ['bg-amber-100 border-amber-300', 'Requested — fair queue'],
     ['bg-slate-200 border-slate-300', 'Booked'],
     ['bg-brand-600 border-brand-600', 'Your selection'],

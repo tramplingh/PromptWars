@@ -107,3 +107,21 @@ export interface InsightsResponse {
   source: AiSource;
   insights: Insight[];
 }
+
+export type ActivityType = 'requested' | 'confirmed' | 'approved' | 'declined' | 'reallocated';
+
+export interface ActivityEvent {
+  /** Stable id: `${bookingId}:${type}`. */
+  id: string;
+  type: ActivityType;
+  /** ISO timestamp of the event. */
+  at: string;
+  bookingId: string;
+  equipmentId: string;
+  equipmentName: string;
+  studentName: string;
+  slot: Booking['slot'];
+  projectTitle: string;
+  deadline: string;
+  note?: string;
+}

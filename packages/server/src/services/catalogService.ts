@@ -69,6 +69,6 @@ export class CatalogService {
   }
 
   personaName(id: string): string {
-    return this.personaById.get(id)?.name ?? 'Unknown user';
+    return this.personaById.get(id)?.name ?? 'A student';
   }
 }

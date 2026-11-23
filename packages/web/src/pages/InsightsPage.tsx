@@ -3,6 +3,8 @@ import { Activity, Gauge, Lightbulb, Timer } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { AiSourceBadge } from '../components/Badges';
 import { ErrorState, Loading } from '../components/States';
+import { Card } from '../components/ui/Card';
+import { RankedBars } from '../components/ui/ProgressBar';
 import { longDate, percent } from '../lib/format';
 import { useCatalogIndex, useRecommendations, useSession, useUtilisation } from '../lib/queries';
 
@@ -21,12 +23,14 @@ export function InsightsPage() {
   const pendingHours = items.reduce((s, i) => s + i.pendingHours, 0);
   const idle = items.filter((i) => i.capacityHours > 0 && i.approvedHours === 0).length;
   const maxLoad = Math.max(1, ...peakHours.map((p) => p.load));
+  // Items arrive sorted by utilisation (desc); maintenance items have no capacity.
+  const operational = items.filter((i) => i.capacityHours > 0);
 
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold sm:text-3xl">Resource utilisation</h1>
-        <p className="mt-1 text-slate-600">
+        <h1 className="page-title">Resource utilisation</h1>
+        <p className="mt-1 text-sm text-slate-600">
           {longDate(from)} – {longDate(to)} · 10 working days across all departments
         </p>
       </header>
@@ -49,6 +53,32 @@ export function InsightsPage() {
         />
       </ul>
 
+      <Card
+        title="Equipment performance"
+        description="Approved hours as a share of bookable capacity"
+        bodyClassName="grid gap-8 p-5 md:grid-cols-2 [&>*]:min-w-0"
+      >
+        <div>
+          <h3 className="mb-4 text-sm font-semibold text-ink">Highest utilisation</h3>
+          <RankedBars
+            tone="teal"
+            items={operational
+              .slice(0, 5)
+              .map((i) => ({ id: i.equipmentId, label: i.name, value: i.utilisation }))}
+          />
+        </div>
+        <div className="md:border-l md:border-slate-200 md:pl-8">
+          <h3 className="mb-4 text-sm font-semibold text-ink">Lowest utilisation</h3>
+          <RankedBars
+            tone="orange"
+            items={[...operational]
+              .reverse()
+              .slice(0, 5)
+              .map((i) => ({ id: i.equipmentId, label: i.name, value: i.utilisation }))}
+          />
+        </div>
+      </Card>
+
       <section aria-labelledby="recs-title" className="card p-5">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h2 id="recs-title" className="section-title flex items-center gap-2">
@@ -67,7 +97,10 @@ export function InsightsPage() {
         ) : (
           <ul className="grid gap-4 md:grid-cols-2">
             {recommendations.data.insights.map((insight) => (
-              <li key={insight.title} className="rounded-xl border border-slate-200 p-4">
+              <li
+                key={insight.title}
+                className="rounded-lg border border-slate-200 border-l-4 border-l-amber-400 p-4"
+              >
                 <p className="font-semibold">{insight.title}</p>
                 <p className="mt-1 text-sm text-slate-600">{insight.detail}</p>
                 <p className="mt-2 text-sm font-medium text-brand-700">→ {insight.action}</p>

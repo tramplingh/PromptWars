@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { ToastProvider } from './components/Toast';
 import { ApiClientError } from './lib/api';
+import '@fontsource-variable/inter/wght.css';
 import './index.css';
 
 const queryClient = new QueryClient({

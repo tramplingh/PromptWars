@@ -7,6 +7,7 @@ import { SessionSigner } from './http/session.js';
 import { systemClock, type Clock } from './lib/clock.js';
 import type { BookingRepository } from './repositories/bookingRepository.js';
 import { MemoryBookingRepository } from './repositories/memoryBookingRepository.js';
+import { ActivityService } from './services/activityService.js';
 import { ApprovalService } from './services/approvalService.js';
 import { BookingService } from './services/bookingService.js';
 import { CatalogService } from './services/catalogService.js';
@@ -36,6 +37,7 @@ export async function buildServices(
     bookings,
     approvals: new ApprovalService(repo, catalog, bookings, clock),
     insights: new InsightsService(repo, catalog, clock),
+    activity: new ActivityService(repo, catalog, clock),
     ai: new AiService(llm, catalog),
     signer: new SessionSigner(config.sessionSecret),
     clock,
