@@ -165,6 +165,9 @@ export class BookingService {
     if (equipment.status !== 'operational')
       throw conflict(`${equipment.name} is under maintenance`);
     if (slot.date < today) throw badRequest('Choose a date from today onwards');
+    if (slot.date === today && slot.endHour <= this.clock.hour()) {
+      throw badRequest('That time has already passed today');
+    }
     if (slot.date > addDays(today, BOOKING_HORIZON_DAYS)) {
       throw badRequest(`Bookings open ${BOOKING_HORIZON_DAYS} days in advance`);
     }

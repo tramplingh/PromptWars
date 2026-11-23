@@ -260,3 +260,133 @@ describe('role-aware shell', () => {
     );
   });
 });
+
+describe('project planner', () => {
+  const plan = {
+    source: 'gemini',
+    title: 'Drone build',
+    summary: 'Scope the sensors then cut the frame.',
+    deadline: '2099-01-20',
+    feasible: true,
+    finish: { date: '2099-01-06', hour: 12 },
+    slackDays: 14,
+    steps: [
+      {
+        id: 's1',
+        title: 'Debug sensors',
+        purpose: 'Check I2C signals',
+        requirements: ['oscilloscope'],
+        hours: 2,
+        dependsOn: [],
+        schedule: {
+          stepId: 's1',
+          status: 'scheduled',
+          equipmentId: 'dso',
+          fit: 1,
+          sessions: [{ date: '2099-01-05', startHour: 10, endHour: 12 }],
+        },
+      },
+      {
+        id: 's2',
+        title: 'Record EMG',
+        purpose: 'Capture muscle data',
+        requirements: ['emg'],
+        hours: 2,
+        dependsOn: ['s1'],
+        schedule: {
+          stepId: 's2',
+          status: 'unschedulable',
+          reason: 'No operational equipment on campus offers these capabilities',
+        },
+      },
+    ],
+  };
+
+  it('shows ordered steps, assignments, gaps and books the plan', async () => {
+    const fetchMock = mockApi({
+      ...baseRoutes,
+      'POST /planner/plan': plan,
+      'POST /planner/book': {
+        results: [
+          {
+            equipmentId: 'dso',
+            slot: { date: '2099-01-05', startHour: 10, endHour: 12 },
+            outcome: 'confirmed',
+            bookingId: 'b1',
+          },
+        ],
+      },
+    });
+    const { container } = renderWithProviders(<App />, { route: '/planner' });
+    await userEvent.type(
+      await screen.findByLabelText('Project description'),
+      'Drone: debug sensors with a scope and record EMG',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Plan my project' }));
+
+    const steps = await screen.findByRole('list', { name: 'Plan steps in order' });
+    expect(
+      within(steps).getByRole('heading', { name: 'Step 1: Debug sensors' }),
+    ).toBeInTheDocument();
+    expect(within(steps).getByRole('link', { name: 'Oscilloscope' })).toBeInTheDocument();
+    expect(within(steps).getByText(/No operational equipment/)).toBeInTheDocument();
+    expect(within(steps).getByText(/after step 1/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Book all 1 session' }));
+    expect(await screen.findByRole('heading', { name: 'Booking results' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/planner/book',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('check-in', () => {
+  it('shows staff the kiosk code and today’s sessions', async () => {
+    mockApi({
+      ...baseRoutes,
+      'GET /session': { persona: rao },
+      'GET /equipment/dso/kiosk': {
+        equipmentId: 'dso',
+        date: '2099-01-05',
+        code: 'ABC234',
+        sessions: [
+          {
+            id: 'b1',
+            equipmentId: 'dso',
+            userId: 's-priya',
+            userName: 'Priya Sharma',
+            equipmentName: 'Oscilloscope',
+            slot: { date: '2099-01-05', startHour: 10, endHour: 12 },
+            project: { title: 'Radio', summary: 'x', deadline: '2099-01-20', requirements: [] },
+            status: 'no-show',
+            createdAt: '2099-01-01T00:00:00Z',
+          },
+        ],
+      },
+    });
+    const { container } = renderWithProviders(<App />, { route: '/kiosk/dso' });
+    expect(await screen.findByLabelText('Check-in code A B C 2 3 4')).toBeInTheDocument();
+    expect(screen.getByText('No-show · released')).toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it('checks the student in from the kiosk QR link', async () => {
+    const fetchMock = mockApi({
+      ...baseRoutes,
+      'POST /check-in': {
+        id: 'b1',
+        equipmentId: 'dso',
+        equipmentName: 'Oscilloscope',
+        slot: { date: '2099-01-05', startHour: 10, endHour: 12 },
+      },
+    });
+    renderWithProviders(<App />, { route: '/check-in?e=dso&c=abc234' });
+    expect(await screen.findByText('Checked in to Oscilloscope')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/check-in',
+      expect.objectContaining({ body: JSON.stringify({ equipmentId: 'dso', code: 'ABC234' }) }),
+    );
+  });
+});

@@ -1,12 +1,20 @@
-import { formatSlot, type BookingView } from '@lablink/shared';
-import { ArrowRightLeft, CalendarDays } from 'lucide-react';
+import { CHECK_IN_OPENS_BEFORE_MINUTES, formatSlot, type BookingView } from '@lablink/shared';
+import { ArrowRightLeft, CalendarDays, ScanLine } from 'lucide-react';
+import { useId, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../components/Badges';
+import { timeOfDay } from '../components/shell/activityText';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
 import { errorMessage } from '../lib/api';
 import { localToday } from '../lib/format';
-import { useCancelBooking, useCatalogIndex, useMyBookings, useSession } from '../lib/queries';
+import {
+  useCancelBooking,
+  useCatalogIndex,
+  useCheckIn,
+  useMyBookings,
+  useSession,
+} from '../lib/queries';
 
 export function MyBookingsPage() {
   const { data: session } = useSession();
@@ -73,6 +81,7 @@ const STATUS_ACCENT: Record<BookingView['status'], string> = {
   pending: 'border-l-amber-500',
   rejected: 'border-l-rose-500',
   cancelled: 'border-l-slate-300',
+  'no-show': 'border-l-rose-500',
 };
 
 function BookingRow({
@@ -87,6 +96,15 @@ function BookingRow({
   const index = useCatalogIndex();
   const canCancel = cancellable && (booking.status === 'pending' || booking.status === 'approved');
   const from = booking.reallocatedFrom;
+  // Mirrors the server rule (the server re-checks): window opens 15 min before start, closes at the end.
+  const now = new Date();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const checkInOpen =
+    booking.status === 'approved' &&
+    !booking.checkedInAt &&
+    booking.slot.date === localToday() &&
+    minutes >= booking.slot.startHour * 60 - CHECK_IN_OPENS_BEFORE_MINUTES &&
+    minutes < booking.slot.endHour * 60;
 
   return (
     <li
@@ -117,6 +135,24 @@ function BookingRow({
         {booking.decision?.note && booking.decision.by !== 'system' && !from && (
           <p className="text-sm text-slate-600">Faculty note: “{booking.decision.note}”</p>
         )}
+        {booking.checkedInAt && (
+          <p className="flex items-center gap-1.5 text-sm text-teal-800">
+            <ScanLine aria-hidden="true" className="h-4 w-4" /> Checked in at{' '}
+            {timeOfDay(booking.checkedInAt)}
+          </p>
+        )}
+        {booking.status === 'no-show' && (
+          <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            No check-in within 15 minutes of the start, so the slot was released to other students.
+            These hours still count toward your fair-share usage.
+          </p>
+        )}
+        {booking.backfilledFrom && (
+          <p className="rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-900">
+            You received this slot automatically when another student didn’t show up.
+          </p>
+        )}
+        {checkInOpen && <CheckInForm booking={booking} />}
       </div>
       {canCancel && (
         <button
@@ -134,5 +170,53 @@ function BookingRow({
         </button>
       )}
     </li>
+  );
+}
+
+/** Enter the 6-character code shown on the lab kiosk (or scan its QR) to prove you are at the device. */
+function CheckInForm({ booking }: { booking: BookingView }) {
+  const checkIn = useCheckIn();
+  const notify = useToast();
+  const [code, setCode] = useState('');
+  const id = useId();
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    checkIn.mutate(
+      { equipmentId: booking.equipmentId, code },
+      {
+        onSuccess: () => notify(`Checked in to ${booking.equipmentName}. Enjoy your session!`),
+        onError: (error) => notify(errorMessage(error), 'error'),
+      },
+    );
+  };
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="flex flex-wrap items-end gap-2 rounded-lg border border-teal-200 bg-teal-50/70 p-3"
+    >
+      <div className="min-w-[10rem] flex-1">
+        <label htmlFor={id} className="mb-1 block text-xs font-medium text-teal-900">
+          Check in within 15 minutes of the start — enter the code on the lab display
+        </label>
+        <input
+          id={id}
+          className="field font-mono uppercase tracking-[0.3em]"
+          value={code}
+          maxLength={6}
+          autoComplete="off"
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="ABC234"
+        />
+      </div>
+      <button
+        type="submit"
+        className="btn-primary"
+        disabled={checkIn.isPending || code.trim().length !== 6}
+      >
+        <ScanLine aria-hidden="true" className="h-4 w-4" /> Check in
+      </button>
+    </form>
   );
 }

@@ -16,6 +16,9 @@ const MapPage = page(() => import('./pages/MapPage'), 'MapPage');
 const MyBookingsPage = page(() => import('./pages/MyBookingsPage'), 'MyBookingsPage');
 const ApprovalsPage = page(() => import('./pages/ApprovalsPage'), 'ApprovalsPage');
 const InsightsPage = page(() => import('./pages/InsightsPage'), 'InsightsPage');
+const PlannerPage = page(() => import('./pages/PlannerPage'), 'PlannerPage');
+const KioskPage = page(() => import('./pages/KioskPage'), 'KioskPage');
+const CheckInPage = page(() => import('./pages/CheckInPage'), 'CheckInPage');
 
 /** Shows a friendly explanation instead of a page the current role cannot use (the API enforces this too). */
 function RoleGate({ roles, children }: { roles: Role[]; children: ReactNode }) {
@@ -43,6 +46,23 @@ export function App() {
         <Route path="equipment" element={<EquipmentListPage />} />
         <Route path="equipment/:id" element={<EquipmentRoute />} />
         <Route path="map" element={<MapPage />} />
+        <Route path="check-in" element={<CheckInPage />} />
+        <Route
+          path="kiosk/:id"
+          element={
+            <RoleGate roles={['faculty', 'admin']}>
+              <KioskPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="planner"
+          element={
+            <RoleGate roles={['student']}>
+              <PlannerPage />
+            </RoleGate>
+          }
+        />
         <Route
           path="bookings"
           element={

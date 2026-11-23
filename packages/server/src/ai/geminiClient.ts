@@ -19,7 +19,7 @@ export class GeminiClient implements LlmClient {
 
   async generateJson<T>(request: JsonGenerationRequest<T>): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), request.timeoutMs ?? this.options.timeoutMs);
     try {
       const response = await this.ai.models.generateContent({
         model: this.options.model,

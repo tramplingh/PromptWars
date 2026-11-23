@@ -12,13 +12,16 @@ import { ActivityService } from '../src/services/activityService.js';
 import { ApprovalService } from '../src/services/approvalService.js';
 import { BookingService } from '../src/services/bookingService.js';
 import { CatalogService } from '../src/services/catalogService.js';
+import { CheckInService } from '../src/services/checkInService.js';
 import type { Services } from '../src/services/container.js';
 import { InsightsService } from '../src/services/insightsService.js';
+import { PlannerService } from '../src/services/plannerService.js';
 
 /** Monday — keeps working-day arithmetic in tests predictable. */
 export const TODAY = '2026-11-23';
 export const NOW = '2026-11-23T04:30:00.000Z';
 export const DAYS = workingDays(TODAY, 10);
+const SECRET = 'test-secret-that-is-at-least-32-characters-long';
 
 export function buildTestServices(
   options: { llm?: LlmClient | null; seed?: boolean } = {},
@@ -29,14 +32,17 @@ export function buildTestServices(
     options.seed === false ? [] : buildSeedBookings(TODAY, NOW),
   );
   const bookings = new BookingService(repo, catalog, clock);
+  const ai = new AiService(options.llm ?? null, catalog, { warn: () => undefined });
   return {
     catalog,
     bookings,
     approvals: new ApprovalService(repo, catalog, bookings, clock),
     insights: new InsightsService(repo, catalog, clock),
     activity: new ActivityService(repo, catalog, clock),
-    ai: new AiService(options.llm ?? null, catalog, { warn: () => undefined }),
-    signer: new SessionSigner('test-secret-that-is-at-least-32-characters-long'),
+    planner: new PlannerService(repo, catalog, bookings, ai, clock),
+    checkIns: new CheckInService(repo, catalog, bookings, clock, SECRET, { warn: () => undefined }),
+    ai,
+    signer: new SessionSigner(SECRET),
     clock,
     secureCookies: false,
   };

@@ -10,7 +10,9 @@ import { aiRoutes } from './http/routes/ai.js';
 import { approvalRoutes } from './http/routes/approvals.js';
 import { bookingRoutes } from './http/routes/bookings.js';
 import { catalogRoutes } from './http/routes/catalog.js';
+import { checkInRoutes } from './http/routes/checkIn.js';
 import { insightsRoutes } from './http/routes/insights.js';
+import { plannerRoutes } from './http/routes/planner.js';
 import { sessionRoutes } from './http/routes/session.js';
 import type { Services } from './services/container.js';
 
@@ -64,7 +66,7 @@ export function createApp(services: Services, options: AppOptions = {}): Express
     );
     // Gemini calls cost money and latency: tighter budget per client.
     api.use(
-      '/ai',
+      ['/ai', '/planner/plan'],
       rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false }),
     );
     api.use(
@@ -75,6 +77,11 @@ export function createApp(services: Services, options: AppOptions = {}): Express
   api.use(express.json({ limit: '16kb' }));
   api.use(requireJsonForMutations);
   api.use(attachPersona(services.signer, services.catalog));
+  // Lazy no-show expiry: serverless has no background worker, so reads trigger the (throttled) sweep.
+  api.use((req, _res, next) => {
+    if (req.method !== 'GET') return next();
+    services.checkIns.sweepIfDue().then(() => next(), next);
+  });
 
   api.get('/health', (_req, res) => {
     res.set('Cache-Control', 'no-store').json({ status: 'ok', ai: services.ai.status() });
@@ -85,6 +92,8 @@ export function createApp(services: Services, options: AppOptions = {}): Express
   api.use(approvalRoutes(services));
   api.use(insightsRoutes(services));
   api.use(activityRoutes(services));
+  api.use(plannerRoutes(services));
+  api.use(checkInRoutes(services));
   api.use(aiRoutes(services));
   api.use((_req, _res, next) => next(notFound('Endpoint')));
 

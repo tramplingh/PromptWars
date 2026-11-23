@@ -16,7 +16,13 @@ export const EQUIPMENT_CATEGORIES = [
 ] as const;
 export type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
 
-export const BOOKING_STATUSES = ['pending', 'approved', 'rejected', 'cancelled'] as const;
+export const BOOKING_STATUSES = [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+  'no-show',
+] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 /** Statuses that occupy capacity on the equipment calendar. */
@@ -100,4 +106,8 @@ export interface Booking {
   decision?: Decision;
   /** Set when conflict resolution moved this booking to another slot or device. */
   reallocatedFrom?: { equipmentId: string; slot: TimeSlot };
+  /** ISO timestamp of a verified check-in at the device. */
+  checkedInAt?: string;
+  /** Id of the no-show booking whose released slot this booking received. */
+  backfilledFrom?: string;
 }

@@ -12,8 +12,13 @@ import type {
   DecisionInput,
   EquipmentDetail,
   InsightsResponse,
+  KioskView,
   LiveStatus,
   Persona,
+  PlanBookingInput,
+  PlanBookingResult,
+  PlanRequest,
+  ProjectPlanResponse,
   SessionInfo,
   UtilisationReport,
 } from '@lablink/shared';
@@ -34,6 +39,7 @@ export const keys = {
   // Nested under 'equipment' so booking mutations invalidate it with the calendars.
   liveStatus: ['equipment', 'live-status'] as const,
   activity: ['activity'] as const,
+  kiosk: (id: string) => ['equipment', id, 'kiosk'] as const,
 };
 
 const STATIC = { staleTime: 5 * 60_000 };
@@ -191,4 +197,34 @@ export const useAiDraft = () =>
   useMutation({
     mutationFn: (input: { equipmentId: string; idea: string }) =>
       api.post<AiDraftResponse>('/ai/draft', input),
+  });
+
+export const usePlanProject = () =>
+  useMutation({
+    mutationFn: (input: PlanRequest) => api.post<ProjectPlanResponse>('/planner/plan', input),
+  });
+
+export function useBookPlan() {
+  const invalidate = useInvalidateBookingData();
+  return useMutation({
+    mutationFn: (input: PlanBookingInput) => api.post<PlanBookingResult>('/planner/book', input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCheckIn() {
+  const invalidate = useInvalidateBookingData();
+  return useMutation({
+    mutationFn: (input: { equipmentId: string; code: string }) =>
+      api.post<BookingView>('/check-in', input),
+    onSuccess: invalidate,
+  });
+}
+
+/** Lab kiosk data; refreshed every 30 s so check-ins and releases appear live. */
+export const useKiosk = (equipmentId: string) =>
+  useQuery({
+    queryKey: keys.kiosk(equipmentId),
+    queryFn: () => api.get<KioskView>(`/equipment/${encodeURIComponent(equipmentId)}/kiosk`),
+    refetchInterval: 30_000,
   });

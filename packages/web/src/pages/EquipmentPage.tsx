@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock,
   MapPin,
+  ScanLine,
   Timer,
   Users,
   Wrench,
@@ -213,10 +214,16 @@ function EquipmentPage({ id }: { id: string }) {
                   onUseAlternative={useAlternative}
                 />
               ) : (
-                <p className="text-sm text-slate-600">
-                  Bookings are made by students. Switch to a student profile in the header to try
-                  the booking flow.
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    Bookings are made by students. Switch to a student profile in the top bar to try
+                    the booking flow.
+                  </p>
+                  <Link to={`/kiosk/${equipment.id}`} className="btn-secondary w-full">
+                    <ScanLine aria-hidden="true" className="h-4 w-4" /> Open lab kiosk display
+                    (check-in QR)
+                  </Link>
+                </div>
               )}
             </div>
           </section>

@@ -13,8 +13,8 @@ type Tab = 'requests' | 'decisions' | 'reallocations';
 
 const TAB_TYPES: Record<Tab, ActivityType[]> = {
   requests: ['requested', 'confirmed'],
-  decisions: ['approved', 'declined'],
-  reallocations: ['reallocated'],
+  decisions: ['approved', 'declined', 'checked-in'],
+  reallocations: ['reallocated', 'no-show', 'backfilled'],
 };
 
 const TYPE_CHIP: Record<ActivityType, { label: string; className: string }> = {
@@ -29,6 +29,9 @@ const TYPE_CHIP: Record<ActivityType, { label: string; className: string }> = {
     label: 'Reallocated',
     className: 'border-violet-200 bg-violet-50 text-violet-800',
   },
+  'checked-in': { label: 'Checked in', className: 'border-teal-200 bg-teal-50 text-teal-800' },
+  'no-show': { label: 'No-show · released', className: 'border-rose-200 bg-rose-50 text-rose-800' },
+  backfilled: { label: 'Backfilled', className: 'border-violet-200 bg-violet-50 text-violet-800' },
 };
 
 /** Activity feed with tabs and an "only unread" switch, in the style of a customer-updates panel. */
@@ -110,7 +113,7 @@ export function UpdatesFeed() {
           tabs={[
             { id: 'requests', label: 'Requests', count: counts.requests },
             { id: 'decisions', label: 'Decisions', count: counts.decisions },
-            { id: 'reallocations', label: 'Moved', count: counts.reallocations },
+            { id: 'reallocations', label: 'Moves & releases', count: counts.reallocations },
           ]}
         />
       </div>

@@ -10,6 +10,8 @@ export interface JsonGenerationRequest<T> {
   /** Runtime validator: the model's output is untrusted until it passes this. */
   validator: z.ZodType<T>;
   maxOutputTokens?: number;
+  /** Overrides the client default timeout for unusually long answers. */
+  timeoutMs?: number;
 }
 
 /** Provider-agnostic structured-output LLM client (Gemini in production, fakes in tests). */

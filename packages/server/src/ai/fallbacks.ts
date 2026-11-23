@@ -1,9 +1,11 @@
 import type {
   AiDraftResponse,
+  AiSource,
   AllocationPlan,
   ConflictExplanation,
   Equipment,
   Insight,
+  PlanStepInput,
   UtilisationReport,
 } from '@lablink/shared';
 import { formatHour, formatSlot } from '@lablink/shared';
@@ -89,7 +91,7 @@ const SYNONYMS: Record<string, string[]> = {
   gpu: ['gpu'],
   cuda: ['cuda'],
   prototype: ['prototyping'],
-  enclosure: ['3d-printing', 'laser-cutting'],
+  enclosure: ['3d-printing'],
   strength: ['tensile-testing'],
   tensile: ['tensile-testing'],
   wearable: ['wearables'],
@@ -233,4 +235,104 @@ export function insightsFallback(report: UtilisationReport): Insight[] {
     });
   }
   return insights;
+}
+
+/**
+ * Capability tags implied by free text (direct tag words plus everyday synonyms),
+ * ordered by where they are first mentioned — students usually describe steps in order.
+ */
+export function wantedTags(text: string, catalog: readonly Equipment[]): string[] {
+  const tokens = tokenize(text);
+  const vocabulary = new Set(catalog.flatMap((e) => e.capabilities));
+  const firstMention = new Map<string, number>();
+  tokens.forEach((token, position) => {
+    const candidates = [
+      ...(SYNONYMS[token] ?? []),
+      ...[...vocabulary].filter((tag) => token.length >= 3 && tag.split('-').includes(token)),
+    ];
+    for (const tag of candidates)
+      if (vocabulary.has(tag) && !firstMention.has(tag)) firstMention.set(tag, position);
+  });
+  return [...firstMention.entries()].sort((a, b) => a[1] - b[1]).map(([tag]) => tag);
+}
+
+const ACRONYMS: Record<string, string> = {
+  pcb: 'PCB',
+  rf: 'RF',
+  emg: 'EMG',
+  ecg: 'ECG',
+  eeg: 'EEG',
+  gpu: 'GPU',
+  cuda: 'CUDA',
+  fdm: 'FDM',
+  sla: 'SLA',
+  pcr: 'PCR',
+  vr: 'VR',
+  '3d': '3D',
+  ai: 'AI',
+  emi: 'EMI',
+  cnc: 'CNC',
+  hci: 'HCI',
+};
+
+/** "pcb-milling" → "PCB milling". */
+export function humanizeTag(tag: string): string {
+  const words = tag.split('-').map((w) => ACRONYMS[w] ?? w);
+  const first = words[0] ?? '';
+  return [
+    first === first.toLowerCase() ? first.charAt(0).toUpperCase() + first.slice(1) : first,
+    ...words.slice(1),
+  ].join(' ');
+}
+
+export interface Decomposition {
+  source: AiSource;
+  title: string;
+  summary: string;
+  steps: (PlanStepInput & { purpose: string })[];
+}
+
+/**
+ * Rule-based project breakdown: greedily groups the mentioned capabilities by
+ * the single device covering most of them (one step per machine), keeps the
+ * order of first mention, and chains the steps sequentially.
+ */
+export function decomposeFallback(
+  description: string,
+  catalog: readonly Equipment[],
+): Decomposition {
+  const operational = catalog.filter((e) => e.status === 'operational');
+  const remaining = wantedTags(description, catalog).filter((tag) =>
+    operational.some((e) => e.capabilities.includes(tag)),
+  );
+  const groups: string[][] = [];
+  while (remaining.length > 0 && groups.length < 6) {
+    // The earliest-mentioned remaining tag is the primary need of the next step.
+    const primary = remaining[0]!;
+    const device = operational
+      .filter((e) => e.capabilities.includes(primary))
+      .map((e) => ({ e, covered: remaining.filter((t) => e.capabilities.includes(t)) }))
+      .sort((a, b) => b.covered.length - a.covered.length)[0]!;
+    groups.push(device.covered.slice(0, 3));
+    for (const tag of device.covered) remaining.splice(remaining.indexOf(tag), 1);
+  }
+
+  const steps = groups.map((requirements, i) => ({
+    id: `s${i + 1}`,
+    title: humanizeTag(requirements[0]!),
+    purpose: `Needs ${requirements.join(', ')}.`,
+    requirements,
+    hours: 2,
+    dependsOn: i > 0 ? [`s${i}`] : [],
+  }));
+  const words = description.trim().split(/\s+/);
+  return {
+    source: 'fallback',
+    title: words
+      .slice(0, 7)
+      .join(' ')
+      .replace(/[.,;:!?]+$/, ''),
+    summary: description.trim().slice(0, 600),
+    steps,
+  };
 }

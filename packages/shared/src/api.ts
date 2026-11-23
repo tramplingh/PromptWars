@@ -1,6 +1,7 @@
 import type { Alternative, AllocationPlan, PriorityScore } from './allocation.js';
 import type { DayAvailability } from './availability.js';
-import type { Booking, Department, Equipment, Lab, Persona } from './domain.js';
+import type { Booking, Department, Equipment, Lab, Persona, TimeSlot } from './domain.js';
+import type { CalendarPoint, StepSchedule } from './planner.js';
 
 /** Response contracts for the LabLink HTTP API. */
 
@@ -108,7 +109,15 @@ export interface InsightsResponse {
   insights: Insight[];
 }
 
-export type ActivityType = 'requested' | 'confirmed' | 'approved' | 'declined' | 'reallocated';
+export type ActivityType =
+  | 'requested'
+  | 'confirmed'
+  | 'approved'
+  | 'declined'
+  | 'reallocated'
+  | 'checked-in'
+  | 'no-show'
+  | 'backfilled';
 
 export interface ActivityEvent {
   /** Stable id: `${bookingId}:${type}`. */
@@ -124,4 +133,46 @@ export interface ActivityEvent {
   projectTitle: string;
   deadline: string;
   note?: string;
+}
+
+export interface PlannedStepView {
+  id: string;
+  title: string;
+  /** One line on why this step is needed. */
+  purpose: string;
+  requirements: string[];
+  hours: number;
+  dependsOn: string[];
+  schedule: StepSchedule;
+}
+
+export interface ProjectPlanResponse {
+  source: AiSource;
+  title: string;
+  summary: string;
+  deadline: string;
+  /** In execution order. */
+  steps: PlannedStepView[];
+  feasible: boolean;
+  finish?: CalendarPoint;
+  /** Working buffer between the last session and the deadline, in calendar days. */
+  slackDays?: number;
+}
+
+export interface PlanBookingResult {
+  results: {
+    equipmentId: string;
+    slot: TimeSlot;
+    outcome: BookingOutcome | 'failed';
+    bookingId?: string;
+    error?: string;
+  }[];
+}
+
+/** Lab kiosk display for one device: today's check-in code and sessions. */
+export interface KioskView {
+  equipmentId: string;
+  date: string;
+  code: string;
+  sessions: BookingView[];
 }

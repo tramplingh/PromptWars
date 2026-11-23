@@ -77,3 +77,42 @@ export const conflictIdSchema = z.object({
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type DecisionInput = z.infer<typeof decisionSchema>;
 export type ProjectInput = z.infer<typeof projectSchema>;
+
+export const planRequestSchema = z.object({
+  description: z
+    .string()
+    .trim()
+    .min(20, 'Describe your project in at least 20 characters')
+    .max(1500),
+  deadline: isoDateSchema,
+});
+
+export const planBookingSchema = z.object({
+  project: z.object({
+    title: projectSchema.shape.title,
+    summary: projectSchema.shape.summary,
+    deadline: isoDateSchema,
+  }),
+  items: z
+    .array(
+      z.object({
+        equipmentId: id,
+        slot: timeSlotSchema,
+        requirements: z.array(capabilityTagSchema).max(10),
+      }),
+    )
+    .min(1)
+    .max(20),
+});
+
+export type PlanRequest = z.infer<typeof planRequestSchema>;
+export type PlanBookingInput = z.infer<typeof planBookingSchema>;
+
+export const checkInSchema = z.object({
+  equipmentId: id,
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{6}$/, 'Enter the 6-character code shown on the lab display'),
+});

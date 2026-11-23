@@ -11,8 +11,10 @@ import { ActivityService } from './services/activityService.js';
 import { ApprovalService } from './services/approvalService.js';
 import { BookingService } from './services/bookingService.js';
 import { CatalogService } from './services/catalogService.js';
+import { CheckInService } from './services/checkInService.js';
 import type { Services } from './services/container.js';
 import { InsightsService } from './services/insightsService.js';
+import { PlannerService } from './services/plannerService.js';
 
 /** Composition root: builds the object graph from configuration. */
 export async function buildServices(
@@ -20,7 +22,7 @@ export async function buildServices(
   clock: Clock = systemClock(config.campusTimeZone),
 ): Promise<Services> {
   const catalog = new CatalogService({ departments, labs, equipment, personas });
-  const seed = buildSeedBookings(clock.today(), clock.now());
+  const seed = buildSeedBookings(clock.today(), clock.now(), clock.hour());
   const repo = await createRepository(config, seed);
 
   const llm = config.gemini.apiKey
@@ -32,13 +34,16 @@ export async function buildServices(
     : null;
 
   const bookings = new BookingService(repo, catalog, clock);
+  const ai = new AiService(llm, catalog);
   return {
     catalog,
     bookings,
     approvals: new ApprovalService(repo, catalog, bookings, clock),
     insights: new InsightsService(repo, catalog, clock),
     activity: new ActivityService(repo, catalog, clock),
-    ai: new AiService(llm, catalog),
+    planner: new PlannerService(repo, catalog, bookings, ai, clock),
+    checkIns: new CheckInService(repo, catalog, bookings, clock, config.sessionSecret),
+    ai,
     signer: new SessionSigner(config.sessionSecret),
     clock,
     secureCookies: config.env === 'production',

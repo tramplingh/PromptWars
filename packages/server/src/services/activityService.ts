@@ -52,18 +52,28 @@ export class ActivityService {
 
   private eventsFor(booking: Booking): ActivityEvent[] {
     const decision = booking.decision;
-    const autoConfirmed = decision?.by === 'system';
+    // System decisions on a fresh booking mean it was confirmed instantly; later
+    // system decisions are the no-show sweep (release) and its backfill.
+    const releasedOrBackfilled =
+      booking.status === 'no-show' || booking.backfilledFrom !== undefined;
+    const autoConfirmed = decision?.by === 'system' && !releasedOrBackfilled;
     const events = [
       this.event(booking, autoConfirmed ? 'confirmed' : 'requested', booking.createdAt),
     ];
     if (decision && !autoConfirmed) {
-      const type: ActivityType = booking.reallocatedFrom
-        ? 'reallocated'
-        : booking.status === 'rejected'
-          ? 'declined'
-          : 'approved';
+      const type: ActivityType =
+        booking.status === 'no-show'
+          ? 'no-show'
+          : booking.backfilledFrom
+            ? 'backfilled'
+            : booking.reallocatedFrom
+              ? 'reallocated'
+              : booking.status === 'rejected'
+                ? 'declined'
+                : 'approved';
       events.push(this.event(booking, type, decision.at, decision.note || undefined));
     }
+    if (booking.checkedInAt) events.push(this.event(booking, 'checked-in', booking.checkedInAt));
     return events;
   }
 

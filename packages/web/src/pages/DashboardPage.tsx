@@ -14,6 +14,7 @@ import {
   Gauge,
   Hourglass,
   ShuffleIcon,
+  Workflow,
   Wrench,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -138,6 +139,28 @@ function StudentDashboard({ persona }: { persona: Persona }) {
           </p>
         </li>
       </ul>
+
+      <Link
+        to="/planner"
+        className="card group flex flex-wrap items-center gap-4 border-violet-200 bg-gradient-to-r from-violet-50 to-brand-50 p-4 transition-shadow hover:shadow-raised"
+      >
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-violet-600 text-white">
+          <Workflow aria-hidden="true" className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">
+            Plan a whole project in one go
+          </span>
+          <span className="block text-sm text-slate-600">
+            Describe it once — LabLink schedules every machine you need, in the right order, before
+            your deadline.
+          </span>
+        </span>
+        <ArrowRight
+          aria-hidden="true"
+          className="h-4 w-4 text-violet-700 transition-transform group-hover:translate-x-0.5"
+        />
+      </Link>
 
       <AiSearchPanel compact />
 

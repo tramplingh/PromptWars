@@ -1,4 +1,5 @@
 import {
+  MAX_PLAN_STEPS,
   capabilityTagSchema,
   formatSlot,
   type AiDraftResponse,
@@ -12,7 +13,14 @@ import {
 import { z } from 'zod';
 import { TtlCache } from '../lib/cache.js';
 import type { CatalogService } from '../services/catalogService.js';
-import { draftFallback, explainFallback, insightsFallback, keywordSearch } from './fallbacks.js';
+import {
+  decomposeFallback,
+  draftFallback,
+  explainFallback,
+  insightsFallback,
+  keywordSearch,
+  type Decomposition,
+} from './fallbacks.js';
 import { UNTRUSTED_INPUT_RULE, wrapUserInput, type LlmClient } from './llmClient.js';
 
 const SYSTEM = [
@@ -47,6 +55,23 @@ const insightsOutput = z.object({
     )
     .min(1)
     .max(4),
+});
+
+const decomposeOutput = z.object({
+  title: z.string().min(3).max(120),
+  summary: z.string().min(20).max(1000),
+  steps: z
+    .array(
+      z.object({
+        title: z.string().min(2).max(80),
+        purpose: z.string().min(2).max(200),
+        requirements: z.array(z.string()).max(6),
+        hours: z.number().min(0.5).max(24),
+        dependsOn: z.array(z.number().int()).max(6),
+      }),
+    )
+    .min(1)
+    .max(8),
 });
 
 const str = { type: 'string' } as const;
@@ -197,6 +222,65 @@ export class AiService {
     });
   }
 
+  /**
+   * Breaks a free-text project into ordered steps the scheduler can place.
+   * The model only proposes steps; capability tags are whitelisted against the
+   * catalogue, hours are clamped and dependencies may only point backwards.
+   */
+  async decomposeProject(
+    description: string,
+    today: string,
+    deadline: string,
+  ): Promise<Decomposition> {
+    const vocabulary = [...new Set(this.catalog.equipment.flatMap((e) => e.capabilities))].sort();
+    const fallback = () => decomposeFallback(description, this.catalog.equipment);
+    const result = await this.cached(
+      ['decompose', description, deadline],
+      fallback,
+      async (llm) => {
+        const out = await llm.generateJson({
+          system: SYSTEM,
+          prompt: [
+            `Today is ${today}; the project deadline is ${deadline}.`,
+            'Break the student project below into 2–6 concrete hands-on steps that each need campus lab equipment,',
+            'in the order they must happen (e.g. mill PCB → debug with oscilloscope → laser-cut enclosure).',
+            'For each step give: title (short), purpose (one sentence), requirements (1–2 capability tags chosen ONLY',
+            'from the vocabulary, PRIMARY capability first — one machine must provide all of them), hours (realistic total',
+            'hands-on hours, 1–12), dependsOn (0-based indexes of EARLIER steps).',
+            `Capability vocabulary: ${vocabulary.join(', ')}`,
+            `Student project:\n${wrapUserInput(description, 1500)}`,
+          ].join('\n'),
+          jsonSchema: obj({
+            title: str,
+            summary: str,
+            steps: {
+              type: 'array',
+              items: obj({
+                title: str,
+                purpose: str,
+                requirements: { type: 'array', items: str },
+                hours: { type: 'number' },
+                dependsOn: { type: 'array', items: { type: 'integer' } },
+              }),
+            },
+          }),
+          validator: decomposeOutput,
+          maxOutputTokens: 1500,
+          // Longer structured answer than the other features: allow extra time.
+          timeoutMs: 20_000,
+        });
+        return {
+          source: 'gemini' as const,
+          title: out.title,
+          summary: out.summary,
+          steps: sanitiseSteps(out.steps, new Set(vocabulary)),
+        };
+      },
+    );
+    // A model answer with no usable steps is no better than the rules.
+    return result.steps.length > 0 ? result : fallback();
+  }
+
   async insights(report: UtilisationReport): Promise<InsightsResponse> {
     const fallback = (): InsightsResponse => ({
       source: 'fallback',
@@ -260,4 +344,35 @@ export class AiService {
       )
       .join('\n');
   }
+}
+
+/**
+ * Makes model-proposed steps safe for the scheduler: keeps only known
+ * capability tags, drops steps left with none, clamps hours, and remaps
+ * dependencies so they only point to earlier, surviving steps.
+ */
+export function sanitiseSteps(
+  raw: z.infer<typeof decomposeOutput>['steps'],
+  vocabulary: ReadonlySet<string>,
+): Decomposition['steps'] {
+  const kept: { index: number; step: (typeof raw)[number]; requirements: string[] }[] = [];
+  raw.forEach((step, index) => {
+    const requirements = [
+      ...new Set(
+        step.requirements
+          .map((r) => capabilityTagSchema.safeParse(r))
+          .flatMap((r) => (r.success && vocabulary.has(r.data) ? [r.data] : [])),
+      ),
+    ];
+    if (requirements.length > 0) kept.push({ index, step, requirements });
+  });
+  const newId = new Map(kept.slice(0, MAX_PLAN_STEPS).map((k, i) => [k.index, `s${i + 1}`]));
+  return kept.slice(0, MAX_PLAN_STEPS).map(({ index, step, requirements }) => ({
+    id: newId.get(index)!,
+    title: step.title,
+    purpose: step.purpose,
+    requirements,
+    hours: Math.min(12, Math.max(1, Math.round(step.hours))),
+    dependsOn: step.dependsOn.filter((d) => d < index && newId.has(d)).map((d) => newId.get(d)!),
+  }));
 }

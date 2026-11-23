@@ -1,5 +1,13 @@
 import type { AiSource, BookingStatus } from '@lablink/shared';
-import { CheckCircle2, CircleSlash, Clock3, Sparkles, Wand2, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleSlash,
+  Clock3,
+  Sparkles,
+  TimerOff,
+  Wand2,
+  XCircle,
+} from 'lucide-react';
 
 const STATUS: Record<BookingStatus, { label: string; className: string; icon: typeof Clock3 }> = {
   pending: {
@@ -16,6 +24,11 @@ const STATUS: Record<BookingStatus, { label: string; className: string; icon: ty
     label: 'Declined',
     className: 'border-rose-200 bg-rose-50 text-rose-800',
     icon: XCircle,
+  },
+  'no-show': {
+    label: 'No-show · released',
+    className: 'border-rose-200 bg-rose-50 text-rose-800',
+    icon: TimerOff,
   },
   cancelled: {
     label: 'Cancelled',

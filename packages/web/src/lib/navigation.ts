@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   Map as MapIcon,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -36,7 +37,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'My work',
-    items: [{ to: '/bookings', label: 'My bookings', icon: CalendarCheck, roles: ['student'] }],
+    items: [
+      { to: '/planner', label: 'Project planner', icon: Workflow, roles: ['student'] },
+      { to: '/bookings', label: 'My bookings', icon: CalendarCheck, roles: ['student'] },
+    ],
   },
   {
     label: 'Lab management',
@@ -57,6 +61,8 @@ export function navForRole(role: Role | undefined): NavGroup[] {
 
 /** Title and breadcrumb trail for the current path. */
 export function pageMeta(pathname: string): { title: string; crumbs: string[] } {
+  if (pathname.startsWith('/kiosk/')) return { title: 'Lab kiosk', crumbs: ['Lab management'] };
+  if (pathname === '/check-in') return { title: 'Check in', crumbs: ['My work'] };
   if (pathname.startsWith('/equipment/'))
     return { title: 'Equipment details', crumbs: ['Explore', 'Equipment'] };
   for (const group of NAV_GROUPS) {

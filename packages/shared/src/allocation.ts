@@ -61,7 +61,7 @@ export function capabilityFit(requirements: readonly string[], equipment: Equipm
   return matched / required.size;
 }
 
-/** Approved hours per user from `today - FAIRNESS_WINDOW_DAYS` onwards (upcoming included). */
+/** Approved (and no-show) hours per user from `today - FAIRNESS_WINDOW_DAYS` onwards (upcoming included). */
 export function computeUsageHours(
   bookings: readonly Booking[],
   today: string,
@@ -69,7 +69,8 @@ export function computeUsageHours(
   const since = addDays(today, -FAIRNESS_WINDOW_DAYS);
   const usage: Record<string, number> = {};
   for (const b of bookings) {
-    if (b.status !== 'approved' || b.slot.date < since) continue;
+    // No-shows still count: the slot was held and denied to others.
+    if ((b.status !== 'approved' && b.status !== 'no-show') || b.slot.date < since) continue;
     usage[b.userId] = (usage[b.userId] ?? 0) + slotHours(b.slot);
   }
   return usage;

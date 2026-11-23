@@ -1,3 +1,5 @@
+import type { CampusTime } from '@lablink/shared';
+
 /** Abstracts "now" so business rules are deterministic under test. */
 export interface Clock {
   /** Current instant as an ISO timestamp. */
@@ -6,28 +8,50 @@ export interface Clock {
   today(): string;
   /** Current campus-local hour, 0–23. */
   hour(): number;
+  /** Campus-local date and minute-of-day of an instant (default: now). */
+  campusTime(iso?: string): CampusTime;
 }
 
 export function systemClock(timeZone: string): Clock {
-  // en-CA formats dates as YYYY-MM-DD.
-  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  });
-  const hourFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
     hour: '2-digit',
+    minute: '2-digit',
     hourCycle: 'h23',
   });
+  const campusTime = (iso?: string): CampusTime => {
+    const parts = Object.fromEntries(
+      formatter.formatToParts(iso ? new Date(iso) : new Date()).map((p) => [p.type, p.value]),
+    );
+    return {
+      date: `${parts.year}-${parts.month}-${parts.day}`,
+      minutes: Number(parts.hour) * 60 + Number(parts.minute),
+    };
+  };
   return {
     now: () => new Date().toISOString(),
-    today: () => dateFormatter.format(new Date()),
-    hour: () => Number(hourFormatter.format(new Date())),
+    today: () => campusTime().date,
+    hour: () => Math.floor(campusTime().minutes / 60),
+    campusTime,
   };
 }
 
-export function fixedClock(nowIso: string, today: string, hour = 10): Clock {
-  return { now: () => nowIso, today: () => today, hour: () => hour };
+/**
+ * Test clock frozen at `nowIso`, which corresponds to `today` at `hour`:00 campus
+ * time. Other instants are converted with the same fixed offset.
+ */
+export function fixedClock(nowIso: string, today: string, hour = 10, minute = 0): Clock {
+  const offsetMs =
+    Date.parse(`${today}T00:00:00.000Z`) + (hour * 60 + minute) * 60_000 - Date.parse(nowIso);
+  const campusTime = (iso?: string): CampusTime => {
+    const local = new Date(Date.parse(iso ?? nowIso) + offsetMs).toISOString();
+    return {
+      date: local.slice(0, 10),
+      minutes: Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16)),
+    };
+  };
+  return { now: () => nowIso, today: () => today, hour: () => hour, campusTime };
 }

@@ -79,6 +79,16 @@ const projects = {
     summary: 'Fluorescence imaging of stained biofilms to quantify growth under antibiotic stress.',
     requirements: ['fluorescence', 'cell-imaging'],
   },
+  vrTour: {
+    title: 'Virtual campus tour for open day',
+    summary: 'Testing a Unity walkthrough of the new workshop for the open-day stall.',
+    requirements: ['vr', '3d-rendering'],
+  },
+  vrMolecules: {
+    title: 'VR protein visualiser',
+    summary: 'Interactive VR view of folded protein structures for a biotech outreach demo.',
+    requirements: ['vr'],
+  },
 } satisfies Record<string, Omit<Project, 'deadline'>>;
 
 const specs: SeedSpec[] = [
@@ -334,22 +344,128 @@ function buildHistory(today: string, nowMs: number): Booking[] {
       },
       status: 'approved',
       createdAt: at,
+      checkedInAt: at,
       decision: { by: 'system', note: 'Seeded demo booking', at },
     };
   });
 }
 
 /**
- * Builds demo bookings relative to the current date so the calendar always
- * looks lived-in, whenever the app is started.
+ * Check-in demo built around the current campus hour (when labs are open):
+ * - Priya has a walk-up oscilloscope session starting now (her "Check in" button is live);
+ * - Arjun's VR session started an hour ago with no check-in → released as a no-show
+ *   on the first API read, and Rohan's queued request is backfilled into the slot.
  */
-export function buildSeedBookings(today: string, nowIso: string): Booking[] {
+function liveSpecs(hour: number): SeedSpec[] {
+  const specs: SeedSpec[] = [];
+  if (hour >= 9 && hour <= 16) {
+    specs.push({
+      id: 'bk-seed-w1',
+      equipmentId: 'dso-keysight',
+      userId: 's-priya',
+      day: 0,
+      startHour: hour,
+      endHour: hour + 2,
+      status: 'approved',
+      deadlineAfterSlot: 9,
+      createdHoursAgo: 0,
+      project: projects.sdr,
+    });
+  }
+  if (hour >= 9 && hour <= 20) {
+    specs.push(
+      {
+        id: 'bk-seed-n1',
+        equipmentId: 'vr-station',
+        userId: 's-arjun',
+        day: 0,
+        startHour: hour - 1,
+        endHour: hour + 1,
+        status: 'approved',
+        deadlineAfterSlot: 7,
+        createdHoursAgo: 24,
+        project: projects.vrTour,
+      },
+      {
+        id: 'bk-seed-n2',
+        equipmentId: 'vr-station',
+        userId: 's-rohan',
+        day: 0,
+        startHour: hour,
+        endHour: hour + 2,
+        status: 'pending',
+        deadlineAfterSlot: 5,
+        createdHoursAgo: 3,
+        project: projects.vrMolecules,
+      },
+    );
+  }
+  return specs;
+}
+
+/** Yesterday's no-show and the backfill it enabled, so the updates feed shows the full story. */
+function yesterdayStory(today: string, nowMs: number): Booking[] {
+  const date = previousWorkingDay(today, 1);
+  const at = new Date(nowMs - 22 * 3_600_000).toISOString();
+  const base = {
+    equipmentId: 'printer-bambu',
+    slot: { date, startHour: 10, endHour: 12 },
+    createdAt: new Date(nowMs - 48 * 3_600_000).toISOString(),
+  };
+  return [
+    {
+      ...base,
+      id: 'bk-seed-y1',
+      userId: 's-zara',
+      project: {
+        ...projects.enclosure,
+        title: 'Sensor housing for vision rig',
+        deadline: addDays(date, 6),
+      },
+      status: 'no-show',
+      decision: { by: 'system', note: 'Released: no check-in within 15 minutes of the start', at },
+    },
+    {
+      ...base,
+      id: 'bk-seed-y2',
+      userId: 's-rohan',
+      project: {
+        ...projects.enclosure,
+        title: 'Microfluidic chip holder',
+        deadline: addDays(date, 4),
+      },
+      status: 'approved',
+      backfilledFrom: 'bk-seed-y1',
+      checkedInAt: at,
+      decision: { by: 'system', note: 'Auto-approved: slot released by a no-show', at },
+    },
+  ];
+}
+
+/**
+ * Builds demo bookings relative to the current date (and campus hour) so the
+ * calendar always looks lived-in, whenever the app is started.
+ */
+export function buildSeedBookings(today: string, nowIso: string, hour = 10): Booking[] {
   const upcoming = workingDays(today, 10);
   const nowMs = Date.parse(nowIso);
+  // The live demo replaces Priya's fixed oscilloscope session when labs are open.
+  const live = liveSpecs(upcoming[0] === today ? hour : -1);
+  const fixed = specs.filter(
+    (s) => !(s.id === 'bk-seed-a1' && live.some((l) => l.id === 'bk-seed-w1')),
+  );
+
   return [
     ...buildHistory(today, nowMs),
-    ...specs.map((s) => {
+    ...yesterdayStory(today, nowMs),
+    ...[...fixed, ...live].map((s): Booking => {
       const date = s.day >= 0 ? upcoming[s.day]! : addDays(today, s.day);
+      const decidedAt = new Date(
+        nowMs - Math.max(0, s.createdHoursAgo - 1) * 3_600_000,
+      ).toISOString();
+      // Sessions that already started were attended — except the live no-show demo.
+      const started = date < today || (date === today && s.startHour < hour);
+      const attended = s.status === 'approved' && started && s.id !== 'bk-seed-n1';
       return {
         id: s.id,
         equipmentId: s.equipmentId,
@@ -359,12 +475,9 @@ export function buildSeedBookings(today: string, nowIso: string): Booking[] {
         status: s.status,
         createdAt: new Date(nowMs - s.createdHoursAgo * 3_600_000).toISOString(),
         ...(s.status === 'approved' && {
-          decision: {
-            by: 'system',
-            note: 'Seeded demo booking',
-            at: new Date(nowMs - (s.createdHoursAgo - 1) * 3_600_000).toISOString(),
-          },
+          decision: { by: 'system', note: 'Seeded demo booking', at: decidedAt },
         }),
+        ...(attended && { checkedInAt: decidedAt }),
       };
     }),
   ];
